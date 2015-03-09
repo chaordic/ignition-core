@@ -80,8 +80,8 @@ object SparkContextUtils {
             false
           else {
             val date = tryDate.get
-            val goodStartDate = startDate.isEmpty || (inclusiveStartDate && date.isEqualOrAfter(startDate.get))
-            val goodEndDate = endDate.isEmpty || (inclusiveEndDate && date.isEqualOrBefore(endDate.get))
+            val goodStartDate = startDate.isEmpty || (inclusiveStartDate && date.saneEqual(startDate.get) || date.isAfter(startDate.get))
+            val goodEndDate = endDate.isEmpty || (inclusiveEndDate && date.saneEqual(endDate.get) || date.isBefore(endDate.get))
             goodStartDate && goodEndDate
           }
         }
