@@ -46,7 +46,7 @@ default_key_file = os.path.expanduser('~/.ssh/ignition_key.pem')
 default_ami = 'ami-35b1885c'  # HVM AMI
 default_master_ami = 'ami-5bb18832'  # PVM AMI
 default_env = 'dev'
-default_spark_version = 'https://circle-artifacts.com/gh/chaordic/spark/3/artifacts/0/tmp/circle-artifacts.zAWvGZt/spark-1.2.2-SNAPSHOT-bin-1.0.4.tgz'
+default_spark_version = '1.3.0'
 default_spark_repo = 'https://github.com/chaordic/spark'
 default_remote_user = 'ec2-user'
 default_remote_control_dir = '/tmp/Ignition'
@@ -55,7 +55,7 @@ default_user_data = os.path.join(script_path, 'scripts', 'S05mount-disks')
 default_defaults_filename = 'cluster_defaults.json'
 
 default_spark_ec2_git_repo = 'https://github.com/chaordic/spark-ec2'
-default_spark_ec2_git_branch = 'v4-yarn'
+default_spark_ec2_git_branch = 'branch-1.3'
 
 
 master_post_create_commands = [
