@@ -496,7 +496,7 @@ def launch_cluster(conn, opts, cluster_name):
             dev = BlockDeviceType()
             dev.ephemeral_name = 'ephemeral%d' % i
             name = '/dev/xvd' + string.letters[i + 1]
-            block_map[name] = devk_map[name] = dev
+            block_map[name] = dev
 
     # Launch slaves
     if opts.spot_price is not None:
