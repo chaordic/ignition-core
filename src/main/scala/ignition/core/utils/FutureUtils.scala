@@ -1,16 +1,27 @@
 package ignition.core.utils
 
+import org.slf4j.LoggerFactory
+
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking, future}
 import scala.util.{Failure, Success}
 
 object FutureUtils {
 
+  private lazy val logger = LoggerFactory.getLogger(getClass)
+
   def blockingFuture[T](body: =>T)(implicit ec: ExecutionContext): Future[T] = future { blocking { body } }
 
   implicit class FutureImprovements[V](future: Future[V]) {
-    def toOptionOnFailure(errorHandler: (Throwable) => Option[V])(implicit ec: ExecutionContext): Future[Option[V]] = {
+
+    private def dummy(t: Throwable): Option[V] = {
+      logger.error("Error on future", t)
+      None
+    }
+
+    def toOptionOnFailure(errorHandler: (Throwable) => Option[V] = dummy)(implicit ec: ExecutionContext): Future[Option[V]] = {
       future.map(Option.apply).recover { case t => errorHandler(t) }
     }
+
   }
 
   implicit class FutureGeneratorImprovements[V](generator: Iterable[() => Future[V]]){
