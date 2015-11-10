@@ -334,6 +334,17 @@ object SparkContextUtils {
         union
     }
 
+    def parallelReadTextFiles(files: List[HadoopFile],
+                              maxBytesPerPartition: Long,
+                              minPartitions: Int,
+                              sizeBasedFileHandling: SizeBasedFileHandling = SizeBasedFileHandling()): RDD[String] = {
+      val (bigFiles, smallFiles) = files.partition(f => sizeBasedFileHandling.isBig(f, maxBytesPerPartition))
+
+      sc.union(
+        readSmallFiles(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling),
+        readBigFiles(bigFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling))
+    }
+
     def parallelTextFiles(paths: List[String],
                           maxBytesPerPartition: Long,
                           minPartitions: Int,
@@ -341,11 +352,7 @@ object SparkContextUtils {
                           sizeBasedFileHandling: SizeBasedFileHandling = SizeBasedFileHandling()): RDD[String] = {
 
       val foundFiles = (if (listOnWorkers) parallelListFiles(paths) else driverListFiles(paths)).filter(_.size > 0)
-      val (bigFiles, smallFiles) = foundFiles.partition(f => sizeBasedFileHandling.isBig(f, maxBytesPerPartition))
-
-      sc.union(
-        readSmallFiles(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling),
-        readBigFiles(bigFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling))
+      parallelReadTextFiles(foundFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling)
     }
 
     private def createPartitioner(files: List[HadoopFile], maxBytesPerPartition: Long, minPartitions: Long, sizeBasedFileHandling: SizeBasedFileHandling): Partitioner = {
