@@ -64,7 +64,6 @@ object CoreJobRunner {
 
       val appName = s"${config.setupName}.${config.tag}"
 
-
       val sparkConf = new SparkConf()
       sparkConf.set("spark.executor.memory", config.executorMemory)
 

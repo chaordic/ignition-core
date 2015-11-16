@@ -1,23 +1,26 @@
 package ignition.core.jobs
 
-import scala.util.Try
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 trait ExecutionRetry {
 
-  def executeRetrying[T](code: => T, maxExecutions: Int = 3): T = {
-    assert(maxExecutions > 0) // we will execute at least once
-    // TODO: log retries
-
-    def _executeRetrying(retriesLeft: Int): Try[T] = {
-      val tryResult = Try { code }
-      if (tryResult.isFailure && retriesLeft > 0) {
-        _executeRetrying(retriesLeft - 1)
-      } else {
-        tryResult
-      }
+  protected def executeRetrying[T](code: => T, maxExecutions: Int, delay: FiniteDuration): Try[T] = {
+    assert(maxExecutions > 0)
+    try {
+      Success(code)
+    } catch {
+      case NonFatal(e) if maxExecutions > 1 =>
+        // TODO: Log execution retries
+        Thread.sleep(delay.toMillis)
+        executeRetrying(code, maxExecutions - 1, delay * 2)
+      case e: Throwable => Failure(e)
     }
-
-    _executeRetrying(maxExecutions - 1).get
   }
 
+  protected def executeRetrying[T](code: => T, maxExecutions: Int = 3): T = {
+    // TODO: log retries
+    executeRetrying(code, maxExecutions - 1, 0.second).get
+  }
 }
