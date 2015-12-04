@@ -31,7 +31,7 @@ object SparkContextUtils {
       inputStream.close()
     } catch {
       case NonFatal(ex) =>
-        println(s"Fail to close resource from '$path': ${ex.getMessage} -- ${ex.getStackTraceString}")
+        println(s"Fail to close resource from '$path': ${ex.getMessage} -- ${ex.getStackTrace}")
     }
   }
 
@@ -289,7 +289,7 @@ object SparkContextUtils {
                        maxBytesPerPartition: Long,
                        minPartitions: Int,
                        sizeBasedFileHandling: SizeBasedFileHandling): RDD[String] = {
-      val smallPartitionedFiles = sc.parallelize(smallFiles.map(_.path).map(file => file -> ()), 2).partitionBy(createSmallFilesPartitioner(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling))
+      val smallPartitionedFiles = sc.parallelize(smallFiles.map(_.path).map(file => file -> Unit), 2).partitionBy(createSmallFilesPartitioner(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling))
       val hadoopConf = _hadoopConf
       smallPartitionedFiles.mapPartitions { files =>
         val conf = hadoopConf.value.foldLeft(new Configuration()) { case (acc, (k, v)) => acc.set(k, v); acc }
@@ -305,8 +305,8 @@ object SparkContextUtils {
             Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
           } catch {
             case NonFatal(ex) =>
-              println(s"Failed to read resource from '$path': ${ex.getMessage} -- ${ex.getStackTraceString}")
-              throw new Exception(s"Failed to read resource from '$path': ${ex.getMessage} -- ${ex.getStackTraceString}")
+              println(s"Failed to read resource from '$path': ${ex.getMessage} -- ${ex.getStackTrace}")
+              throw new Exception(s"Failed to read resource from '$path': ${ex.getMessage} -- ${ex.getStackTrace}")
           } finally {
             close(inputStream, path)
           }
@@ -326,7 +326,7 @@ object SparkContextUtils {
       }
       val hadoopConf = _hadoopConf
 
-      val partitionedSlices = sc.parallelize(slices.map(s => s -> ()), 2).partitionBy(partitioner)
+      val partitionedSlices = sc.parallelize(slices.map(s => s -> Unit), 2).partitionBy(partitioner)
 
       partitionedSlices.mapPartitions { slices =>
         val conf = hadoopConf.value.foldLeft(new Configuration()) { case (acc, (k, v)) => acc.set(k, v); acc }

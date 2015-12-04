@@ -7,7 +7,7 @@ trait BetterTrace {
     try {
       block
     } catch {
-      case t: Throwable => fail(s"${t.getMessage}: ${t.getStackTraceString}")
+      case t: Throwable => fail(s"${t.getMessage}: ${t.getStackTrace}")
     }
 
 }

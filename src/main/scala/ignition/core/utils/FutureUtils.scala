@@ -6,7 +6,7 @@ import scala.util.{Failure, Success, Try}
 
 object FutureUtils {
 
-  def blockingFuture[T](body: =>T)(implicit ec: ExecutionContext): Future[T] = future { blocking { body } }
+  def blockingFuture[T](body: =>T)(implicit ec: ExecutionContext): Future[T] = Future { blocking { body } }
 
   implicit class FutureImprovements[V](future: Future[V]) {
     def toOptionOnFailure(errorHandler: (Throwable) => Option[V])(implicit ec: ExecutionContext): Future[Option[V]] = {
