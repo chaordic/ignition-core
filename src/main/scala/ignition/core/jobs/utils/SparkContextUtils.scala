@@ -394,8 +394,7 @@ object SparkContextUtils {
                                      minPartitions: Int,
                                      listOnWorkers: Boolean,
                                      sizeBasedFileHandling: SizeBasedFileHandling = SizeBasedFileHandling()): RDD[String] = {
-
-      val foundFiles = (if (listOnWorkers) parallelListFiles(paths) else driverListFiles(paths)).filter(_.size > 0)
+      val foundFiles = if (listOnWorkers) parallelListFiles(paths) else driverListFiles(paths)
       parallelReadTextFiles(foundFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling)
     }
 
@@ -403,7 +402,7 @@ object SparkContextUtils {
                               maxBytesPerPartition: Long,
                               minPartitions: Int,
                               sizeBasedFileHandling: SizeBasedFileHandling = SizeBasedFileHandling()): RDD[String] = {
-      val (bigFiles, smallFiles) = files.partition(f => sizeBasedFileHandling.isBig(f, maxBytesPerPartition))
+      val (bigFiles, smallFiles) = files.filter(_.size > 0).partition(f => sizeBasedFileHandling.isBig(f, maxBytesPerPartition))
       sc.union(
         readSmallFiles(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling),
         readBigFiles(bigFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling))
