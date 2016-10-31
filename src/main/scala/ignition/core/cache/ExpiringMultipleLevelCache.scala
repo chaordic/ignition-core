@@ -107,7 +107,6 @@ import ignition.core.cache.ExpiringMultipleLevelCache._
 
 
 case class ExpiringMultipleLevelCache[V](ttl: FiniteDuration,
-                                         localCache: LocalCache[TimestampedValue[V]],
                                          remoteRW: Option[RemoteCacheRW[TimestampedValue[V]]] = None,
                                          remoteLockTTL: FiniteDuration = 5.seconds,
                                          reporter: ExpiringMultipleLevelCache.ReporterCallback = ExpiringMultipleLevelCache.NoOpReporter,
@@ -134,57 +133,12 @@ case class ExpiringMultipleLevelCache[V](ttl: FiniteDuration,
   override def apply(key: String, genValue: () => Future[V])(implicit ec: ExecutionContext): Future[V] = {
     // The local cache is always the first try. We'll only look the remote if the local value is missing or has expired
     val startTime = System.nanoTime()
-    val result = localCache.get(key).map(_.asTry()) match {
-      case Some(future) =>
-        future.flatMap {
-          case Success(localValue) if !localValue.hasExpired(ttl, now) =>
-            // We have locally a good value, just return it
-            reporter.onLocalCacheHit(key, elapsedTime(startTime))
-            Future.successful(localValue.value)
-          case Success(expiredLocalValue) if remoteRW.nonEmpty =>
-            // We have locally an expired value, but we can check a remote cache for better value
-            remoteRW.get.get(key).asTry().flatMap {
-              case Success(Some(remoteValue)) if !remoteValue.hasExpired(ttl, now) =>
-                // Remote is good, set locally and return it
-                reporter.onRemoteCacheHit(key, elapsedTime(startTime))
-                localCache.set(key, remoteValue)
-                Future.successful(remoteValue.value)
-              case Success(Some(expiredRemote)) =>
-                // Expired local and expired remote, return the most recent of them, async update both
-                reporter.onCacheMissButFoundExpiredRemote(key, elapsedTime(startTime))
-                tryGenerateAndSet(key, genValue, startTime)
-                val mostRecent = Set(expiredLocalValue, expiredRemote).maxBy(_.date)
-                Future.successful(mostRecent.value)
-              case Success(None) =>
-                // No remote found, return local, async update both
-                reporter.onCacheMissButFoundExpiredLocal(key, elapsedTime(startTime))
-                tryGenerateAndSet(key, genValue, startTime)
-                Future.successful(expiredLocalValue.value)
-              case Failure(e) =>
-                reporter.onRemoteError(key, e, elapsedTime(startTime))
-                logger.warn(s"ExpiringMultipleLevelCache.apply, key: $key expired local value and failed to get remote", e)
-                tryGenerateAndSet(key, genValue, startTime)
-                Future.successful(expiredLocalValue.value)
-            }
-          case Success(expiredLocalValue) if remoteRW.isEmpty =>
-            // There is no remote cache configured, we'are on our own
-            // Return expired value and try to generate a new one for the future
-            reporter.onCacheMissButFoundExpiredLocal(key, elapsedTime(startTime))
-            tryGenerateAndSet(key, genValue, startTime)
-            Future.successful(expiredLocalValue.value)
-          case Failure(e) =>
-            // This is almost impossible to happen because it's local and we don't save failed values
-            reporter.onLocalError(key, e, elapsedTime(startTime))
-            logger.warn(s"ExpiringMultipleLevelCache.apply, key: $key got a failed future from cache!? This is almost impossible!", e)
-            tryGenerateAndSet(key, genValue, startTime).map(_.value)
-        }
-      case None if remoteRW.nonEmpty =>
+    val result =
         // No local, let's try remote
         remoteRW.get.get(key).asTry().flatMap {
           case Success(Some(remoteValue)) if !remoteValue.hasExpired(ttl, now) =>
             // Remote is good, set locally and return it
             reporter.onRemoteCacheHit(key, elapsedTime(startTime))
-            localCache.set(key, remoteValue)
             Future.successful(remoteValue.value)
           case Success(Some(expiredRemote)) =>
             // Expired remote, return the it, async update
@@ -200,12 +154,6 @@ case class ExpiringMultipleLevelCache[V](ttl: FiniteDuration,
             logger.warn(s"ExpiringMultipleLevelCache.apply, key: $key expired local value and no remote configured", e)
             tryGenerateAndSet(key, genValue, startTime).map(_.value)
         }
-      case None if remoteRW.isEmpty =>
-        // No local and no remote to look, just generate it
-        // The caller will need to wait for the value generation
-        reporter.onCacheMissNothingFound(key, elapsedTime(startTime))
-        tryGenerateAndSet(key, genValue, startTime).map(_.value)
-    }
     result.onComplete {
       case Success(_) =>
         reporter.onCompletedWithSuccess(key, elapsedTime(startTime))
@@ -226,14 +174,12 @@ case class ExpiringMultipleLevelCache[V](ttl: FiniteDuration,
         canonicalValueGenerator(key, genValue, nanoStartTime).onComplete {
           case Success(v) if !v.hasExpired(ttl, now) =>
             reporter.onGeneratedWithSuccess(key, elapsedTime(nanoStartTime))
-            localCache.set(key, v)
             promise.trySuccess(v)
             tempUpdate.remove(key)
           case Success(v) =>
             // Have we generated/got an expired value!?
             reporter.onUnexpectedBehaviour(key, elapsedTime(nanoStartTime))
             logger.warn(s"tryGenerateAndSet, key $key: unexpectedly generated/got an expired value: $v")
-            localCache.set(key, v)
             promise.trySuccess(v)
             tempUpdate.remove(key)
           case Failure(e) =>
