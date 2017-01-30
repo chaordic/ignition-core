@@ -2,15 +2,14 @@ package ignition.core.utils
 
 import akka.actor.ActorSystem
 
+import scala.concurrent._
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking, future}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 object FutureUtils {
 
   def blockingFuture[T](body: =>T)(implicit ec: ExecutionContext): Future[T] = Future { blocking { body } }
-
 
   implicit class FutureImprovements[V](future: Future[V]) {
     def toOptionOnFailure(errorHandler: (Throwable) => Option[V])(implicit ec: ExecutionContext): Future[Option[V]] = {

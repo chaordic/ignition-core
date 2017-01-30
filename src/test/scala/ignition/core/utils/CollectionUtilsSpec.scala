@@ -3,6 +3,11 @@ package ignition.core.utils
 import org.scalatest._
 import CollectionUtils._
 
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.{Success, Failure}
+
 class CollectionUtilsSpec extends FlatSpec with Matchers {
 
   case class MyObj(property: String, value: String)
@@ -50,5 +55,47 @@ class CollectionUtilsSpec extends FlatSpec with Matchers {
     Seq("a", "b", "b", "c", "a", "b").mostFrequentOption shouldBe Option("b")
   }
 
+  ".firstSuccessfulAttempt" should "run futures sequentially and pick the first successful future" in {
+    val r1 = List(1,2,3).firstSuccessfulAttempt { n => Future(n) }
+    val r2 = List(1,2,3).firstSuccessfulAttempt { n => if(n == 1) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r3 = List(1,2,3).firstSuccessfulAttempt { n => if(n == 2) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r4 = List(1,2,3).firstSuccessfulAttempt { n => if(n == 3) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r5 = List(1,2,3).firstSuccessfulAttempt { n => if(n == 1 || n == 2) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r6 = List(1,2,3).firstSuccessfulAttempt { n => if(n == 1 || n == 3) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r7 = List(1,2,3).firstSuccessfulAttempt { n => if(n == 2 || n == 3) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r8 = List(1,2,3).firstSuccessfulAttempt { n => Future.failed(new Exception(n.toString)) }
+    val r9 = List.empty[Int].firstSuccessfulAttempt { n => Future.failed(new Exception(n.toString)) }
 
+    Await.result(r1, 1.second) shouldBe Some(1)
+    Await.result(r2, 1.second) shouldBe Some(1)
+    Await.result(r3, 1.second) shouldBe Some(2)
+    Await.result(r4, 1.second) shouldBe Some(3)
+    Await.result(r5, 1.second) shouldBe Some(1)
+    Await.result(r6, 1.second) shouldBe Some(1)
+    Await.result(r7, 1.second) shouldBe Some(2)
+    Await.result(r8, 1.second) shouldBe None
+    Await.result(r9, 1.second) shouldBe None
+  }
+
+  ".scanUntilSuccess" should "run the futures sequentially and scan until first successful future is evaluated" in {
+    val r1 = List(1,2,3).scanUntilSuccess { n => Future(n) }
+    val r2 = List(1,2,3).scanUntilSuccess { n => if(n == 1) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r3 = List(1,2,3).scanUntilSuccess { n => if(n == 2) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r4 = List(1,2,3).scanUntilSuccess { n => if(n == 3) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r5 = List(1,2,3).scanUntilSuccess { n => if(n == 1 || n == 2) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r6 = List(1,2,3).scanUntilSuccess { n => if(n == 1 || n == 3) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r7 = List(1,2,3).scanUntilSuccess { n => if(n == 2 || n == 3) Future(n) else Future.failed(new Exception(n.toString)) }
+    val r8 = List(1,2,3).scanUntilSuccess { n => Future.failed(new Exception(n.toString)) }
+    val r9 = List.empty[Int].scanUntilSuccess { n => Future.failed(new Exception(n.toString)) }
+
+    Await.result(r1, 1.second).map(n => n.getOrElse(n.failed.get.getMessage)) shouldBe Seq(1)
+    Await.result(r2, 1.second).map(n => n.getOrElse(n.failed.get.getMessage)) shouldBe Seq(1)
+    Await.result(r3, 1.second).map(n => n.getOrElse(n.failed.get.getMessage)) shouldBe Seq("1", 2)
+    Await.result(r4, 1.second).map(n => n.getOrElse(n.failed.get.getMessage)) shouldBe Seq("1", "2", 3)
+    Await.result(r5, 1.second).map(n => n.getOrElse(n.failed.get.getMessage)) shouldBe Seq(1)
+    Await.result(r6, 1.second).map(n => n.getOrElse(n.failed.get.getMessage)) shouldBe Seq(1)
+    Await.result(r7, 1.second).map(n => n.getOrElse(n.failed.get.getMessage)) shouldBe Seq("1", 2)
+    Await.result(r8, 1.second).map(n => n.getOrElse(n.failed.get.getMessage)) shouldBe Seq("1", "2", "3")
+    Await.result(r9, 1.second) shouldBe Seq.empty
+  }
 }

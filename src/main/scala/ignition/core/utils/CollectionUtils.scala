@@ -1,12 +1,14 @@
 package ignition.core.utils
+
+import scala.collection.mutable.ListBuffer
 import scala.collection.{TraversableLike, IterableLike}
 import scala.collection.generic.CanBuildFrom
+import scala.concurrent.{Promise, ExecutionContext, Future}
 import scala.language.implicitConversions
+import scala.util.{Try, Failure, Success}
 import scalaz.Validation
 
 object CollectionUtils {
-
-
 
   implicit class SeqImprovements[A](xs: Seq[A]) {
     def orElseIfEmpty[B >: A](alternative: => Seq[B]): Seq[B] = {
@@ -18,6 +20,37 @@ object CollectionUtils {
     
     def mostFrequentOption: Option[A] = {
       xs.groupBy(identity).maxByOption(_._2.size).map(_._1)
+    }
+
+    def scanUntilSuccess[R](f: A => Future[R])(implicit ec: ExecutionContext): Future[Seq[Try[R]]] = {
+      val p = Promise[Seq[Try[R]]]
+      val results = ListBuffer.empty[Try[R]]
+
+      xs match {
+        case Nil =>
+          p.success(results.toList)
+        case head :: Nil => f(head) onComplete { attempt =>
+          results.append(attempt)
+          p.trySuccess(results.toList)
+        }
+        case head :: tail =>
+          f(head) onComplete {
+            case s @ Success(res) =>
+              results.append(s)
+              p.trySuccess(results.toList)
+            case fail @ Failure(ex) =>
+              results.append(fail)
+              p.completeWith(tail.scanUntilSuccess(f).map(nr => results ++ nr))
+          }
+      }
+
+      p.future.map(_.toSeq)
+    }
+
+    def firstSuccessfulAttempt[R](f: A => Future[R])(implicit ec: ExecutionContext): Future[Option[R]] = {
+      xs.scanUntilSuccess(f).map { list =>
+        list.find(_.isSuccess).flatMap(_.toOption)
+      }
     }
   }
 
