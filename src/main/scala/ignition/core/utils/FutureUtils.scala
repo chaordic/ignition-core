@@ -81,6 +81,26 @@ object FutureUtils {
 
   implicit class FutureCollectionImprovements[V](seq: TraversableOnce[Future[V]]) {
 
+    def firstSuccessful: Future[Option[V]] = {
+      val p = Promise[Option[V]]()
+      val iterator = seq.toIterator
+
+      def tryUntilSuccess: Unit = {
+        if(iterator.hasNext) {
+          iterator.next().onComplete {
+            case Success(x) => p.success(Option(x))
+            case Failure(t) => tryUntilSuccess
+          }
+        } else {
+          p.success(None)
+        }
+      }
+
+      tryUntilSuccess
+
+      p.future
+    }
+
     def collectAndTake[R](pf: PartialFunction[V, R], n: Int, maxBatchSize: Int = 10)(implicit ec: ExecutionContext): Future[List[R]] = {
       val p = Promise[List[R]]()
 
