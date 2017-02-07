@@ -3,6 +3,8 @@ package ignition.core.http
 import ignition.core.http.AsyncHttpClientStreamApi.Request
 import org.scalatest.{FunSpec, Matchers}
 
+import scala.util.Success
+
 class AsyncHttpClientStreamApiSpec extends FunSpec with Matchers {
 
   it("should do the best to parse the provided uri") {

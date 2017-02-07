@@ -10,6 +10,7 @@ import spray.http._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.Try
 
 object AsyncHttpClientStreamApi {
   
@@ -52,11 +53,10 @@ object AsyncHttpClientStreamApi {
                      requestConfiguration: Option[RequestConfiguration] = None) {
 
     def uri: Uri = {
-      // Note: This will guarantee we create a valid request (one with a valid uri). Will throw an exception if invalid
       if (params.nonEmpty)
-        URLUtils.parseUri(url).withQuery(params)
+        URLUtils.parseUri(url).map(_.withQuery(params)).get
       else
-        URLUtils.parseUri(url)
+        URLUtils.parseUri(url).get
     }
   }
 

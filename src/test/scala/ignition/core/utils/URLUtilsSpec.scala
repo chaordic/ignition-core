@@ -2,6 +2,8 @@ package ignition.core.utils
 
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.util.Success
+
 class URLUtilsSpec extends FlatSpec with Matchers {
 
   "URLUtils" should "add parameters to url with encoded params in base url and not be double encoded" in {
@@ -57,19 +59,19 @@ class URLUtilsSpec extends FlatSpec with Matchers {
     )
 
     tests.zip(expectations).foreach {
-      case (url, expected) => URLUtils.parseUri(url).toString shouldBe expected
+      case (url, expected) => URLUtils.parseUri(url).map(_.toString) shouldBe Success(expected)
     }
   }
 
   it should "not encode percent characters in url path" in {
     val url = "http://www.example.com/Pentagrama%C2%AE Acessórios em São Paulo/Qualquer%20Arquivo%20Encodado.pdf"
-    val sane = URLUtils.parseUri(url).toString
-    sane shouldBe "http://www.example.com/Pentagrama%C2%AE%20Acess%C3%B3rios%20em%20S%C3%A3o%20Paulo/Qualquer%20Arquivo%20Encodado.pdf"
+    val sane = URLUtils.parseUri(url).map(_.toString)
+    sane shouldBe Success("http://www.example.com/Pentagrama%C2%AE%20Acess%C3%B3rios%20em%20S%C3%A3o%20Paulo/Qualquer%20Arquivo%20Encodado.pdf")
   }
 
   it should "encode space characters with percent in URL path" in {
     val url = "http://www.example.com/Pentagrama+Invertido.xml?q=blah+bleh"
-    val sane = URLUtils.parseUri(url).toString
-    sane shouldBe "http://www.example.com/Pentagrama%20Invertido.xml?q=blah+bleh"
+    val sane = URLUtils.parseUri(url).map(_.toString)
+    sane shouldBe Success("http://www.example.com/Pentagrama%20Invertido.xml?q=blah+bleh")
   }
 }
