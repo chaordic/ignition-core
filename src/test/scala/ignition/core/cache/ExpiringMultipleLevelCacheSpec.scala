@@ -1,6 +1,7 @@
 package ignition.core.cache
 
 import java.io.FileNotFoundException
+import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
 import ignition.core.cache.ExpiringMultiLevelCache.TimestampedValue
@@ -35,10 +36,10 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
   }
 
   it should "calculate a value on cache miss after ttl" in {
-    var myRequestCount: Int = 0
+    val myRequestCount = new AtomicInteger(0)
 
     def myRequest(): Future[Data] = {
-      myRequestCount += 1
+      myRequestCount.addAndGet(1)
       Future.successful(Data("success"))
     }
 
@@ -59,11 +60,11 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
   }
 
   it should "calculate a value on cache miss just once, the second call should be from cache hit" in {
-    var myFailedRequestCount: Int = 0
+    val myFailedRequestCount = new AtomicInteger(0)
 
     class MyException(s: String) extends FileNotFoundException(s) // Some NonFatal Exception
     def myFailedRequest(): Future[Nothing] = {
-      myFailedRequestCount += 1
+      myFailedRequestCount.addAndGet(1)
       Future.failed(new MyException("some failure"))
     }
 
@@ -103,11 +104,11 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
   }
 
   it should "calculate a value on cache miss on every request" in {
-    var myFailedRequestCount: Int = 0
+    val myFailedRequestCount = new AtomicInteger(0)
 
     class MyException(s: String) extends FileNotFoundException(s) // Some NonFatal Exception
     def myFailedRequest(): Future[Nothing] = {
-      myFailedRequestCount += 1
+      myFailedRequestCount.addAndGet(1)
       Future.failed(new MyException("some failure"))
     }
 
@@ -147,11 +148,11 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
   }
 
   it should "calculate a value on cache miss, then wait ttlCachedError to get a cache miss again" in {
-    var myFailedRequestCount: Int = 0
+    val myFailedRequestCount = new AtomicInteger(0)
 
     class MyException(s: String) extends FileNotFoundException(s) // Some NonFatal Exception
     def myFailedRequest(): Future[Nothing] = {
-      myFailedRequestCount += 1
+      myFailedRequestCount.addAndGet(1)
       Future.failed(new MyException("some failure"))
     }
 
