@@ -47,16 +47,16 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
     val cache = ExpiringMultiLevelCache[Data](ttl = 9.seconds, localCache = Option(local))
 
     Await.result(cache("key", myRequest), 1.minute) shouldBe Data("success")
-    myRequestCount shouldBe 1
+    myRequestCount.get shouldBe 1
     Await.result(cache("key", myRequest), 1.minute) shouldBe Data("success")
-    myRequestCount shouldBe 1
+    myRequestCount.get shouldBe 1
 
     Thread.sleep(10000)
 
     Await.result(cache("key", myRequest), 1.minute) shouldBe Data("success")
-    myRequestCount shouldBe 2
+    myRequestCount.get shouldBe 2
     Await.result(cache("key", myRequest), 1.minute) shouldBe Data("success")
-    myRequestCount shouldBe 2
+    myRequestCount.get shouldBe 2
   }
 
   it should "calculate a value on cache miss just once, the second call should be from cache hit" in {
@@ -74,31 +74,31 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
     val eventualCache = cache("key", myFailedRequest)
     whenReady(eventualCache.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 1
+      myFailedRequestCount.get shouldBe 1
     }
 
     val eventualCache2 = cache("key", myFailedRequest)
     whenReady(eventualCache2.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 1
+      myFailedRequestCount.get shouldBe 1
     }
 
     val eventualCache3 = cache("key", myFailedRequest)
     whenReady(eventualCache3.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 1
+      myFailedRequestCount.get shouldBe 1
     }
 
     val eventualCache4 = cache("key", myFailedRequest)
     whenReady(eventualCache4.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 1
+      myFailedRequestCount.get shouldBe 1
     }
 
     val eventualCache5 = cache("key", myFailedRequest)
     whenReady(eventualCache5.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 1
+      myFailedRequestCount.get shouldBe 1
     }
 
   }
@@ -118,31 +118,31 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
     val eventualCache = cache("key", myFailedRequest)
     whenReady(eventualCache.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 1
+      myFailedRequestCount.get shouldBe 1
     }
 
     val eventualCache2 = cache("key", myFailedRequest)
     whenReady(eventualCache2.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 2
+      myFailedRequestCount.get shouldBe 2
     }
 
     val eventualCache3 = cache("key", myFailedRequest)
     whenReady(eventualCache3.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 3
+      myFailedRequestCount.get shouldBe 3
     }
 
     val eventualCache4 = cache("key", myFailedRequest)
     whenReady(eventualCache4.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 4
+      myFailedRequestCount.get shouldBe 4
     }
 
     val eventualCache5 = cache("key", myFailedRequest)
     whenReady(eventualCache5.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 5
+      myFailedRequestCount.get shouldBe 5
     }
 
   }
@@ -162,13 +162,13 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
     val eventualCache = cache("key", myFailedRequest)
     whenReady(eventualCache.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 1
+      myFailedRequestCount.get shouldBe 1
     }
 
     val eventualCache2 = cache("key", myFailedRequest)
     whenReady(eventualCache2.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 1
+      myFailedRequestCount.get shouldBe 1
     }
 
     Thread.sleep(10000)
@@ -176,13 +176,13 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
     val eventualCache3 = cache("key", myFailedRequest)
     whenReady(eventualCache3.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 2
+      myFailedRequestCount.get shouldBe 2
     }
 
     val eventualCache4 = cache("key", myFailedRequest)
     whenReady(eventualCache4.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 2
+      myFailedRequestCount.get shouldBe 2
     }
 
     Thread.sleep(1000)
@@ -190,7 +190,7 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
     val eventualCache5 = cache("key", myFailedRequest)
     whenReady(eventualCache5.failed) { failure =>
       failure shouldBe a [MyException]
-      myFailedRequestCount shouldBe 2
+      myFailedRequestCount.get shouldBe 2
     }
 
   }
