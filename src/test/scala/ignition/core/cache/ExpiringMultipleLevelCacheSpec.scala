@@ -38,7 +38,7 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
     var myRequestCount: Int = 0
 
     def myRequest(): Future[Data] = {
-      myRequestCount = myRequestCount + 1
+      synchronized { myRequestCount += 1 }
       Future.successful(Data("success"))
     }
 
