@@ -38,7 +38,7 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
     var myRequestCount: Int = 0
 
     def myRequest(): Future[Data] = {
-      synchronized { myRequestCount += 1 }
+      myRequestCount += 1
       Future.successful(Data("success"))
     }
 
@@ -63,7 +63,7 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
 
     class MyException(s: String) extends FileNotFoundException(s) // Some NonFatal Exception
     def myFailedRequest(): Future[Nothing] = {
-      synchronized { myFailedRequestCount += 1 }
+      myFailedRequestCount += 1
       Future.failed(new MyException("some failure"))
     }
 
@@ -107,7 +107,7 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
 
     class MyException(s: String) extends FileNotFoundException(s) // Some NonFatal Exception
     def myFailedRequest(): Future[Nothing] = {
-      synchronized { myFailedRequestCount += 1 }
+      myFailedRequestCount += 1
       Future.failed(new MyException("some failure"))
     }
 
@@ -151,7 +151,7 @@ class ExpiringMultipleLevelCacheSpec extends FlatSpec with Matchers with ScalaFu
 
     class MyException(s: String) extends FileNotFoundException(s) // Some NonFatal Exception
     def myFailedRequest(): Future[Nothing] = {
-      synchronized { myFailedRequestCount += 1 }
+      myFailedRequestCount += 1
       Future.failed(new MyException("some failure"))
     }
 
