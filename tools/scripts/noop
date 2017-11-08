@@ -1,3 +1,3 @@
 #!/bin/bash
 
-echo '*    -    nofile    256000' >> /etc/security/limits.conf
+echo '*    -    nofile    65535' >> /etc/security/limits.conf
