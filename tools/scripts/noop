@@ -1,3 +1,5 @@
 #!/bin/bash
 
 echo '*    -    nofile    65535' >> /etc/security/limits.conf
+
+sudo yum downgrade -y java-1.8.0-openjdk-headless-1.8.0.151 java-1.8.0-openjdk-devel-1.8.0.151 java-1.8.0-openjdk-1.8.0.151
