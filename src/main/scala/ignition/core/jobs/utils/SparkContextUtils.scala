@@ -523,6 +523,35 @@ object SparkContextUtils {
       paths.sortBy { p => p.date.getOrElse(new DateTime(1970, 1, 1, 1, 1)) }(Ordering[DateTime].reverse)
     }
 
+    def getLastFolder(path: String,
+              inclusiveStartDate: Boolean = false,
+              startDate: Option[DateTime] = None,
+              inclusiveEndDate: Boolean = false,
+              endDate: Option[DateTime] = None,
+              exclusionPattern: Option[String] = None)(implicit pathDateExtractor: PathDateExtractor) = {
+      getFolders(path, false, None, false, None, None)(amazonS3ClientFromEnvironmentVariables, pathDateExtractor).head
+    }
+
+    def getFolders(path: String,
+                     inclusiveStartDate: Boolean,
+                     startDate: Option[DateTime],
+                     inclusiveEndDate: Boolean,
+                     endDate: Option[DateTime],
+                     exclusionPattern: Option[String])
+                    (implicit s3: AmazonS3Client, dateExtractor: PathDateExtractor): Stream[WithOptDate[S3SplittedPath]] = {
+
+      S3SplittedPath.from(path) match {
+        case Some(splittedPath) =>
+          val prefixes: Stream[WithOptDate[S3SplittedPath]] =
+            s3NarrowPaths(splittedPath, inclusiveStartDate = inclusiveStartDate, inclusiveEndDate = inclusiveEndDate,
+              startDate = startDate, endDate = endDate)
+
+          sortPaths(prefixes).map { case WithOptDate(date, path) => { WithOptDate(date, path) }}
+
+        case _ => Stream.empty
+      }
+    }
+
     private def sortedS3List(path: String,
                              inclusiveStartDate: Boolean,
                              startDate: Option[DateTime],
@@ -530,7 +559,6 @@ object SparkContextUtils {
                              endDate: Option[DateTime],
                              exclusionPattern: Option[String])
                             (implicit s3: AmazonS3Client, dateExtractor: PathDateExtractor): Stream[WithOptDate[Array[S3ObjectSummary]]] = {
-
 
       S3SplittedPath.from(path) match {
         case Some(splittedPath) =>
@@ -543,7 +571,6 @@ object SparkContextUtils {
         case _ => Stream.empty
       }
     }
-
 
     def listAndFilterFiles(path: String,
                            requireSuccess: Boolean = false,
@@ -695,6 +722,5 @@ object SparkContextUtils {
 
       sc.textFile(cacheKey)
     }
-
   }
 }
