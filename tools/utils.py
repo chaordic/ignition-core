@@ -120,5 +120,6 @@ def check_call_with_timeout(args, stdin=None, stdout=None,
     read_from_to(p.stdout, stdout)
     read_from_to(p.stderr, stderr)
     if p.returncode != 0:
-        raise subprocess.CalledProcessError(p.returncode, args)
+        stdall = 'STDOUT:\n{}\nSTDERR:\n{}'.format(stdout, stderr)
+        raise subprocess.CalledProcessError(p.returncode, args, output=stdall)
     return p.returncode
