@@ -329,7 +329,7 @@ def launch(cluster_name, slaves,
     raise CommandError('Failed to created cluster {} after failures'.format(cluster_name))
 
 
-def destroy(cluster_name, delete_groups=False, region=default_region):
+def destroy(cluster_name, delete_groups=False, region=default_region, wait_termination=False):
     assert not delete_groups, 'Delete groups is deprecated and unsupported'
     masters, slaves = get_active_nodes(cluster_name, region=region)
 
@@ -342,9 +342,17 @@ def destroy(cluster_name, delete_groups=False, region=default_region):
         log.info('Terminating master...')
         for i in masters:
             i.terminate()
+
         log.info('Terminating slaves...')
         for i in slaves:
             i.terminate()
+
+        while wait_termination and all_instances:
+            all_instances = [i for i in all_instances if i.state != 'terminated']
+            sleep(5)
+            for i in all_instances:
+                i.update()
+
         log.info('Done.')
 
 
