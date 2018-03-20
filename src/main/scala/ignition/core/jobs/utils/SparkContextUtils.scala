@@ -49,7 +49,7 @@ object SparkContextUtils {
     def isCompressed(f: HadoopFile): Boolean = compressedExtensions.exists(f.path.endsWith)
   }
 
-  private lazy val amazonS3ClientFromEnvironmentVariables = new AmazonS3Client(new EnvironmentVariableCredentialsProvider())
+  private lazy val amazonS3ClientFromEnvironmentVariables = new AmazonS3Client()
 
   private def close(inputStream: InputStream, path: String): Unit = {
     try {
