@@ -403,6 +403,7 @@ def job_run(cluster_name, job_name, job_mem,
             key_file=default_key_file, disable_tmux=False,
             detached=False, notify_on_errors=False, yarn=False,
             job_user=getpass.getuser(),
+            hadoop_user=os.getenv('HADOOP_USER_NAME') or getpass.getuser(),
             job_timeout_minutes=0,
             remote_user=default_remote_user, utc_job_date=None, job_tag=None,
             disable_wait_completion=False, collect_results_dir=default_collect_results_dir,
@@ -432,10 +433,10 @@ def job_run(cluster_name, job_name, job_mem,
     job_date = utc_job_date or datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     job_tag = job_tag or job_date.replace(':', '_').replace('-', '_').replace('Z', 'UTC')
     tmux_wait_command = ';(echo Press enter to keep the session open && /bin/bash -c "read -t 5" && sleep 7d)' if not detached else ''
-    tmux_arg = ". /etc/profile; . ~/.profile;tmux new-session {detached} -s spark.{job_name}.{job_tag} '{aws_vars} {remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param} {driver_heap_size} {tmux_wait_command}' >& /tmp/commandoutput".format(
-        aws_vars=get_aws_keys_str(), job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, detached='-d' if detached else '', yarn_param=yarn_param, notify_param=notify_param, driver_heap_size=driver_heap_size, tmux_wait_command=tmux_wait_command)
-    non_tmux_arg = ". /etc/profile; . ~/.profile;{aws_vars} {remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param} {driver_heap_size} >& /tmp/commandoutput".format(
-        aws_vars=get_aws_keys_str(), job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, yarn_param=yarn_param, notify_param=notify_param, driver_heap_size=driver_heap_size)
+    tmux_arg = ". /etc/profile; . ~/.profile;tmux new-session {detached} -s spark.{job_name}.{job_tag} '{aws_vars} {remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param} {driver_heap_size} {hadoop_user} {tmux_wait_command}' >& /tmp/commandoutput".format(
+        aws_vars=get_aws_keys_str(), job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, detached='-d' if detached else '', yarn_param=yarn_param, notify_param=notify_param, driver_heap_size=driver_heap_size, hadoop_user=hadoop_user, tmux_wait_command=tmux_wait_command)
+    non_tmux_arg = ". /etc/profile; . ~/.profile;{aws_vars} {remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param} {driver_heap_size} {hadoop_user} >& /tmp/commandoutput".format(
+        aws_vars=get_aws_keys_str(), job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, yarn_param=yarn_param, notify_param=notify_param, driver_heap_size=driver_heap_size, hadoop_user=hadoop_user)
 
 
     if not disable_assembly_build:

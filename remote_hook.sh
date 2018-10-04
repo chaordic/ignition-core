@@ -14,6 +14,7 @@ SPARK_MEM_PARAM="${6?Please give the Job Memory Size to use}"
 USE_YARN="${7?Please tell if we should use YARN (yes/no)}"
 NOTIFY_ON_ERRORS="${8?Please tell if we will notify on errors (yes/no)}"
 DRIVER_HEAP_SIZE="${9?Please tell driver heap size to use}"
+HADOOP_USER="${10?Please provide a hadoop user}"
 
 JOB_WITH_TAG=${JOB_NAME}.${JOB_TAG}
 JOB_CONTROL_DIR="${CONTROL_DIR}/${JOB_WITH_TAG}"
@@ -107,6 +108,7 @@ cp ${JAR_PATH_SRC} ${JAR_PATH}
 # If no $MASTER, then build a url using $SPARK_MASTER_HOST
 export JOB_MASTER=${MASTER:-spark://${SPARK_MASTER_HOST}:7077}
 
+export HADOOP_USER_NAME=$HADOOP_USER
 
 if [[ "${USE_YARN}" == "yes" ]]; then
     export YARN_MODE=true
