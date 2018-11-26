@@ -11,9 +11,7 @@ parallelExecution in Test := false
 
 test in assembly := {}
 
-libraryDependencies += ("org.apache.spark" %% "spark-core" % "2.3.2" % "provided")
-
-libraryDependencies += ("org.apache.spark" %% "spark-sql" % "2.3.2" % "provided")
+libraryDependencies += ("org.apache.spark" %% "spark-sql" % "2.4.0" % "provided")
 
 libraryDependencies += ("org.apache.hadoop" % "hadoop-client" % "2.7.6" % "provided")
 
