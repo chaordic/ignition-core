@@ -3,7 +3,7 @@ package ignition.core.jobs.utils
 import java.io.InputStream
 
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
-import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.services.s3.{AmazonS3, AmazonS3Builder, AmazonS3Client}
 import com.amazonaws.services.s3.model.{ListObjectsRequest, ObjectListing, S3ObjectSummary}
 import ignition.core.utils.CollectionUtils._
 import ignition.core.utils.DateUtils._
@@ -49,7 +49,8 @@ object SparkContextUtils {
     def isCompressed(f: HadoopFile): Boolean = compressedExtensions.exists(f.path.endsWith)
   }
 
-  private lazy val amazonS3ClientFromEnvironmentVariables = new AmazonS3Client(new DefaultAWSCredentialsProviderChain())
+  private lazy val amazonS3ClientFromEnvironmentVariables: AmazonS3 =
+    AmazonS3Client.builder().withCredentials(new DefaultAWSCredentialsProviderChain()).build()
 
   private def close(inputStream: InputStream, path: String): Unit = {
     try {
@@ -453,7 +454,7 @@ object SparkContextUtils {
     }
 
     def s3ListCommonPrefixes(path: S3SplittedPath, delimiter: String = "/")
-                            (implicit s3: AmazonS3Client): Stream[S3SplittedPath] = {
+                            (implicit s3: AmazonS3): Stream[S3SplittedPath] = {
       def inner(current: ObjectListing): Stream[String] =
         if (current.isTruncated) {
           logger.trace(s"list common prefixed truncated for ${path.bucket} ${path.key}: ${current.getCommonPrefixes}")
@@ -468,7 +469,7 @@ object SparkContextUtils {
     }
 
     def s3ListObjects(path: S3SplittedPath)
-                     (implicit s3: AmazonS3Client): Stream[S3ObjectSummary] = {
+                     (implicit s3: AmazonS3): Stream[S3ObjectSummary] = {
       def inner(current: ObjectListing): Stream[S3ObjectSummary] =
         if (current.isTruncated) {
           logger.trace(s"list objects truncated for ${path.bucket} ${path.key}: $current")
@@ -487,7 +488,7 @@ object SparkContextUtils {
                       inclusiveEndDate: Boolean = true,
                       endDate: Option[DateTime] = None,
                       ignoreHours: Boolean = true)
-                     (implicit s3: AmazonS3Client, pathDateExtractor: PathDateExtractor): Stream[WithOptDate[S3SplittedPath]] = {
+                     (implicit s3: AmazonS3, pathDateExtractor: PathDateExtractor): Stream[WithOptDate[S3SplittedPath]] = {
 
       def isGoodDate(date: DateTime): Boolean = {
         val startDateToCompare =  startDate.map(date => if (ignoreHours) date.withTimeAtStartOfDay() else date)
@@ -529,7 +530,7 @@ object SparkContextUtils {
                              inclusiveEndDate: Boolean,
                              endDate: Option[DateTime],
                              exclusionPattern: Option[String])
-                            (implicit s3: AmazonS3Client, dateExtractor: PathDateExtractor): Stream[WithOptDate[Array[S3ObjectSummary]]] = {
+                            (implicit s3: AmazonS3, dateExtractor: PathDateExtractor): Stream[WithOptDate[Array[S3ObjectSummary]]] = {
 
 
       S3SplittedPath.from(path) match {
