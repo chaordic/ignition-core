@@ -11,9 +11,13 @@ parallelExecution in Test := false
 
 test in assembly := {}
 
-libraryDependencies += ("org.apache.spark" %% "spark-sql" % "2.4.0" % "provided")
+libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.4.0" % "provided"
 
-libraryDependencies += ("org.apache.hadoop" % "hadoop-client" % "2.7.6" % "provided")
+libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.7.6" % "provided"
+
+libraryDependencies += "org.apache.hadoop" % "hadoop-aws" % "2.7.6" % "provided"
+
+libraryDependencies += "com.amazonaws" % "aws-java-sdk" % "1.7.4" % "provided"
 
 libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.2.27"
 
@@ -24,7 +28,5 @@ libraryDependencies += "joda-time" % "joda-time" % "2.9.9"
 libraryDependencies += "org.joda" % "joda-convert" % "1.8.2"
 
 libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.25"
-
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.456"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.3"

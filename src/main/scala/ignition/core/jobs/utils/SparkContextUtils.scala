@@ -3,8 +3,8 @@ package ignition.core.jobs.utils
 import java.io.InputStream
 
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3Builder, AmazonS3Client}
 import com.amazonaws.services.s3.model.{ListObjectsRequest, ObjectListing, S3ObjectSummary}
+import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
 import ignition.core.utils.CollectionUtils._
 import ignition.core.utils.DateUtils._
 import ignition.core.utils.ExceptionUtils._
@@ -49,8 +49,7 @@ object SparkContextUtils {
     def isCompressed(f: HadoopFile): Boolean = compressedExtensions.exists(f.path.endsWith)
   }
 
-  private lazy val amazonS3ClientFromEnvironmentVariables: AmazonS3 =
-    AmazonS3Client.builder().withCredentials(new DefaultAWSCredentialsProviderChain()).build()
+  private lazy val amazonS3ClientFromEnvironmentVariables: AmazonS3 = new AmazonS3Client(new DefaultAWSCredentialsProviderChain())
 
   private def close(inputStream: InputStream, path: String): Unit = {
     try {
