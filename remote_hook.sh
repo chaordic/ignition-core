@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 
 # We suppose we are in a subdirectory of the root project
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
