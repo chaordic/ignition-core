@@ -87,7 +87,7 @@ install_and_run_jupyter() {
     export PYSPARK_PYTHON=$(which python3)
     export PYSPARK_DRIVER_PYTHON=$(which jupyter)
     export PYSPARK_DRIVER_PYTHON_OPTS="notebook --allow-root --ip=${SPARK_MASTER_HOST} --no-browser --port=8888"
-    sudo $(which jupyter) toree install --spark_home="${SPARK_HOME}"
+    sudo $(which jupyter) toree install --spark_home="${SPARK_HOME}" --spark_opts="--master ${JOB_MASTER} --executor-memory ${SPARK_MEM_PARAM} --driver-memory ${DRIVER_HEAP_SIZE}"
     sudo -E "${SPARK_HOME}/bin/pyspark" --master "${JOB_MASTER}" --executor-memory "${SPARK_MEM_PARAM}" --driver-memory "${DRIVER_HEAP_SIZE}"
 }
 
