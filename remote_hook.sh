@@ -78,7 +78,7 @@ install_and_run_zeppelin() {
 
 install_and_run_jupyter() {
     sudo yum -y install python3 python3-pip
-    sudo pip3 install jupyter pandas boto3 matplotlib numpy sklearn scipy
+    sudo pip3 install jupyter pandas boto3 matplotlib numpy sklearn scipy toree
     export SPARK_HOME=$(get_first_present /root/spark /opt/spark ~/spark*/)
     export HADOOP_HOME=$(get_first_present /root/hadoop /opt/hadoop ~/hadoop*/)
     export SPARK_CONF_DIR="${SPARK_HOME}/conf"
@@ -87,6 +87,7 @@ install_and_run_jupyter() {
     export PYSPARK_PYTHON=$(which python3)
     export PYSPARK_DRIVER_PYTHON=$(which jupyter)
     export PYSPARK_DRIVER_PYTHON_OPTS="notebook --allow-root --ip=${SPARK_MASTER_HOST} --no-browser --port=8888"
+    sudo $(which jupyter) toree install --spark_home="${SPARK_HOME}"
     sudo -E "${SPARK_HOME}/bin/pyspark" --master "${JOB_MASTER}" --executor-memory "${SPARK_MEM_PARAM}" --driver-memory "${DRIVER_HEAP_SIZE}"
 }
 
