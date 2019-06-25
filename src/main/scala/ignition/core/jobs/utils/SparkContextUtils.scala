@@ -19,7 +19,7 @@ import org.apache.spark.{Partitioner, SparkContext}
 import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.{Codec, Source}
@@ -82,7 +82,7 @@ object SparkContextUtils {
 
     private lazy val logger = LoggerFactory.getLogger(getClass)
 
-    lazy val _hadoopConf = sc.broadcast(sc.hadoopConfiguration.iterator().map { case entry => entry.getKey -> entry.getValue }.toMap)
+    lazy val _hadoopConf = sc.broadcast(sc.hadoopConfiguration.iterator().asScala.map { case entry => entry.getKey -> entry.getValue }.toMap)
 
     private def getFileSystem(path: Path): FileSystem = {
       path.getFileSystem(sc.hadoopConfiguration)
@@ -181,7 +181,6 @@ object SparkContextUtils {
         paths.map(p => {
           val hdfsPath = p.replaceFirst("s3[an]://", hdfsPathPrefix)
           if (forceSynch || getStatus(hdfsPath, false).isEmpty || getStatus(s"$hdfsPath/*", true).filterNot(_.isDirectory).size != filesToOutput) {
-            val _hdfsPath = new Path(hdfsPath)
             actionWhenNeedsSynching(p, hdfsPath)
           }
           hdfsPath
@@ -457,10 +456,10 @@ object SparkContextUtils {
       def inner(current: ObjectListing): Stream[String] =
         if (current.isTruncated) {
           logger.trace(s"list common prefixed truncated for ${path.bucket} ${path.key}: ${current.getCommonPrefixes}")
-          current.getCommonPrefixes.toStream ++ inner(s3.listNextBatchOfObjects(current))
+          current.getCommonPrefixes.asScala.toStream ++ inner(s3.listNextBatchOfObjects(current))
         } else {
           logger.trace(s"list common prefixed finished for ${path.bucket} ${path.key}: ${current.getCommonPrefixes}")
-          current.getCommonPrefixes.toStream
+          current.getCommonPrefixes.asScala.toStream
         }
 
       val request = new ListObjectsRequest(path.bucket, path.key, null, delimiter, 1000)
@@ -472,10 +471,10 @@ object SparkContextUtils {
       def inner(current: ObjectListing): Stream[S3ObjectSummary] =
         if (current.isTruncated) {
           logger.trace(s"list objects truncated for ${path.bucket} ${path.key}: $current")
-          current.getObjectSummaries.toStream ++ inner(s3.listNextBatchOfObjects(current))
+          current.getObjectSummaries.asScala.toStream ++ inner(s3.listNextBatchOfObjects(current))
         } else {
           logger.trace(s"list objects finished for ${path.bucket} ${path.key}")
-          current.getObjectSummaries.toStream
+          current.getObjectSummaries.asScala.toStream
         }
 
       inner(s3.listObjects(path.bucket, path.key))
@@ -674,9 +673,9 @@ object SparkContextUtils {
     private def doSync(hadoopFiles: List[HadoopFile],
                        synchLocally: String,
                        forceSynch: Boolean,
-                       maxBytesPerPartition: Long = 128 * 1000 * 1000,
-                       minPartitions: Int = 100,
-                       sizeBasedFileHandling: SizeBasedFileHandling = SizeBasedFileHandling()): RDD[String] = {
+                       maxBytesPerPartition: Long,
+                       minPartitions: Int,
+                       sizeBasedFileHandling: SizeBasedFileHandling): RDD[String] = {
       require(!synchLocally.contains("*"), "Globs are not supported on the sync key")
 
       def syncPath(suffix: String) = s"$hdfsPathPrefix/_core_ignition_sync_hdfs_cache/$suffix"

@@ -1,12 +1,10 @@
 package ignition.core.utils
-import scala.collection.{TraversableLike, IterableLike}
-import scala.collection.generic.CanBuildFrom
-import scala.language.implicitConversions
 import scalaz.Validation
 
+import scala.collection.generic.CanBuildFrom
+import scala.collection.{IterableLike, TraversableLike}
+
 object CollectionUtils {
-
-
 
   implicit class SeqImprovements[A](xs: Seq[A]) {
     def orElseIfEmpty[B >: A](alternative: => Seq[B]): Seq[B] = {

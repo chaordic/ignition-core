@@ -2,7 +2,7 @@ name := "Ignition-Core"
 
 version := "1.0"
 
-scalaVersion := "2.11.12"
+scalaVersion := "2.12.8"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xfatal-warnings", "-Xlint", "-Ywarn-dead-code", "-Xmax-classfile-name", "130")
 
@@ -11,7 +11,7 @@ parallelExecution in Test := false
 
 test in assembly := {}
 
-libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.4.0" % "provided"
+libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.4.3" % "provided"
 
 libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.7.6" % "provided"
 

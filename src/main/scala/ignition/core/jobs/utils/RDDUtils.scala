@@ -1,18 +1,12 @@
 package ignition.core.jobs.utils
 
+import org.apache.spark.rdd.RDD
 import org.slf4j.LoggerFactory
-
-import scala.reflect._
-import org.apache.spark.rdd.{CoGroupedRDD, PairRDDFunctions, RDD}
-import org.apache.spark.SparkContext._
-import org.apache.spark.Partitioner
-import org.apache.spark
-import org.joda.time.DateTime
-import org.joda.time.format.DateTimeFormat
+import scalaz.{Success, Validation}
 
 import scala.collection.mutable
+import scala.reflect._
 import scala.util.Random
-import scalaz.{Success, Validation}
 
 object RDDUtils {
 

@@ -2,8 +2,6 @@ package ignition.core.utils
 
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.util.Success
-
 class URLUtilsSpec extends FlatSpec with Matchers {
 
   "URLUtils" should "add parameters to url with encoded params in base url and not be double encoded" in {

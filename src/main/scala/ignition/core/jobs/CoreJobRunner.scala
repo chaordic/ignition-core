@@ -6,7 +6,6 @@ import org.joda.time.{DateTime, DateTimeZone}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
-import scala.util.Try
 
 object CoreJobRunner {
 

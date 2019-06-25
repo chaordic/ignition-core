@@ -1,7 +1,6 @@
 package ignition.core.utils
 
-import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking, future}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -46,7 +45,7 @@ object FutureUtils {
   }
 
   implicit class FutureGeneratorImprovements[V](generator: Iterable[() => Future[V]]){
-    def toLazyIterable(batchSize: Int = 1)(implicit ec: ExecutionContext): Iterable[Future[V]] = new Iterable[Future[V]] {
+    def toLazyIterable(batchSize: Int = 1): Iterable[Future[V]] = new Iterable[Future[V]] {
       override def iterator =  new Iterator[Future[V]] {
         val generatorIterator = generator.toIterator
         var currentBatch: List[Future[V]] = List.empty
