@@ -2,7 +2,7 @@ name := "Ignition-Core"
 
 version := "1.0"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.11.12"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xfatal-warnings", "-Xlint", "-Ywarn-dead-code", "-Xmax-classfile-name", "130")
 
