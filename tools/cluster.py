@@ -423,7 +423,7 @@ def get_assembly_path():
 @arg('--detached', help='Run job in background, requires tmux')
 @arg('--destroy-cluster', help='Will destroy cluster after finishing the job')
 @arg('--extra', action='append', type=str, help='Additional arguments for the job in the format k=v')
-@arg('--propagate-aws-credentials', type=bool, help='Setting this to false will not propagate your AWS credentials from your environment to the master')
+@arg('--disable-propagate-aws-credentials', help='Setting this to true will not propagate your AWS credentials from your environment to the master')
 @named('run')
 def job_run(cluster_name, job_name, job_mem,
             key_file=default_key_file, disable_tmux=False,
@@ -440,7 +440,7 @@ def job_run(cluster_name, job_name, job_mem,
             region=default_region,
             driver_heap_size=default_driver_heap_size,
             remove_files=True,
-            propagate_aws_credentials=True,
+            disable_propagate_aws_credentials=False,
             extra=[]):
 
     utc_job_date_example = '2014-05-04T13:13:10Z'
@@ -458,7 +458,7 @@ def job_run(cluster_name, job_name, job_mem,
     remote_hook = '{remote_path}/remote_hook.sh'.format(remote_path=remote_path)
     notify_param = 'yes' if notify_on_errors else 'no'
     yarn_param = 'yes' if yarn else 'no'
-    aws_vars = get_aws_keys_str() if propagate_aws_credentials else ''
+    aws_vars = get_aws_keys_str() if not disable_propagate_aws_credentials else ''
     job_date = utc_job_date or datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     job_tag = job_tag or job_date.replace(':', '_').replace('-', '_').replace('Z', 'UTC')
     runner_extra_args = ' '.join('--runner-extra "%s"' % arg for arg in extra)
