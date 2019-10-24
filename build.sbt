@@ -9,7 +9,7 @@ scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xfatal-warning
 // Because we can't run two spark contexts on same VM
 parallelExecution in Test := false
 
-test in assembly := {}
+//test in assembly := {}
 
 libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.4.3" % "provided"
 
