@@ -7,7 +7,7 @@ import akka.pattern.after
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap
 import ignition.core.utils.DateUtils._
 import ignition.core.utils.FutureUtils._
-import org.joda.time.{DateTime, DateTimeZone, Interval}
+import org.joda.time.{DateTime, DateTimeZone}
 import org.slf4j.LoggerFactory
 import spray.caching.ValueMagnet
 
@@ -519,10 +519,12 @@ case class ExpiringMultiLevelCache[V](ttl: FiniteDuration,
               // The value is missing or has expired
               // Let's start from scratch because we need to be able to set or get a good value
               // Note: do not increment retry because this isn't an error
+              // Note2: incrementing retry because this might be causing high latency
               reporter.onStillTryingToLockOrGet(key, elapsedTime(nanoStartTime))
               logger.info(s"remoteSetOrGet couldn't lock key $key and didn't found good value on remote, scheduling retry")
+
               after(backoffOnLockAcquire, scheduler) {
-                remoteSetOrGet(key, calculatedValue, remote, nanoStartTime, currentRetry = currentRetry)
+                remoteSetOrGet(key, calculatedValue, remote, nanoStartTime, currentRetry = currentRetry + 1)
               }
             case Failure(e) =>
               reporter.onRemoteError(key, e, elapsedTime(nanoStartTime))
