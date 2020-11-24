@@ -18,6 +18,7 @@ import org.apache.spark.rdd.{RDD, UnionRDD}
 import org.apache.spark.{Partitioner, SparkContext}
 import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
+import org.slf4j.Logger
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -277,7 +278,7 @@ object SparkContextUtils {
             case None => fileSystem.open(hadoopPath)
           }
           try {
-            Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
+            Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(_.contains("consul")).foldLeft(ArrayBuffer.empty[String])(_ += _)
           } catch {
             case NonFatal(ex) =>
               println(s"Failed to read resource from '$path': ${ex.getMessage} -- ${ex.getFullStackTraceString}")
@@ -313,7 +314,7 @@ object SparkContextUtils {
               case Some(compression) => compression.createInputStream(fileSystem.open(hadoopPath))
               case None => fileSystem.open(hadoopPath)
             }
-            val lines = Source.fromInputStream(inputStream)(Codec.UTF8).getLines()
+            val lines = Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(_.contains("consul"))
 
             val lineSample = lines.take(sampleCount).toList
             val linesPerSlice = {
@@ -662,6 +663,10 @@ object SparkContextUtils {
 
       val foundFiles = listAndFilterFiles(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate,
         endDate, lastN, ignoreMalformedDates, endsWith, predicate = predicate)
+
+      val countFiles = foundFiles.length;
+
+      logger.info(s"count files >>> ${countFiles} :: path ${path}")
 
       if (foundFiles.size < minimumFiles)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of files $foundFiles is less than the required")
