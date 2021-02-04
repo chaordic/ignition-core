@@ -479,6 +479,21 @@ def job_run(cluster_name, job_name, job_mem,
     ssh_call(user=remote_user, host=master, key_file=key_file,
              args=['mkdir', '-p', remote_path])
 
+    # yum_downgrade_java = ['sudo', 'yum', 'downgrade', '-y', 'java-1.8.0-openjdk-1:1.8.0.191.b12-0.amzn2.x86_64', 'java-1.8.0-openjdk-headless-1:1.8.0.191.b12-0.amzn2.x86_64', 'java-1.8.0-openjdk-devel-1:1.8.0.191.b12-0.amzn2.x86_64']
+    yum_downgrade_java = ['sudo', 'yum', 'downgrade', '-y', 'java-1.8.0-openjdk-1:1.8.0.265.b01-1.amzn2.0.1.x86_64', 'java-1.8.0-openjdk-headless-1:1.8.0.265.b01-1.amzn2.0.1.x86_64', 'java-1.8.0-openjdk-devel-1:1.8.0.265.b01-1.amzn2.0.1.x86_64']
+
+    _, slaves = get_active_nodes(cluster_name, region=region)
+
+    log.info('Downgrade on slaves...')
+    for node in slaves:
+        host = node.public_dns_name or node.private_dns_name
+        ssh_call(user=remote_user, host=host, key_file=key_file,
+             args=yum_downgrade_java)
+
+    log.info('Downgrade on master...')
+    ssh_call(user=remote_user, host=master, key_file=key_file,
+             args=yum_downgrade_java)
+
     rsync_call(user=remote_user,
                host=master,
                key_file=key_file,
