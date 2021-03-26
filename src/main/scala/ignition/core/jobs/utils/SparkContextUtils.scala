@@ -277,7 +277,7 @@ object SparkContextUtils {
             case None => fileSystem.open(hadoopPath)
           }
           try {
-            Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
+            Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(_ => _.contains("tokstok") || _.contains("tokstok-linx")).foldLeft(ArrayBuffer.empty[String])(_ += _)
           } catch {
             case NonFatal(ex) =>
               println(s"Failed to read resource from '$path': ${ex.getMessage} -- ${ex.getFullStackTraceString}")
@@ -313,7 +313,8 @@ object SparkContextUtils {
               case Some(compression) => compression.createInputStream(fileSystem.open(hadoopPath))
               case None => fileSystem.open(hadoopPath)
             }
-            val lines = Source.fromInputStream(inputStream)(Codec.UTF8).getLines()
+
+            val lines = Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(_ => _.contains("tokstok") || _.contains("tokstok-linx"))
 
             val lineSample = lines.take(sampleCount).toList
             val linesPerSlice = {
