@@ -277,7 +277,7 @@ object SparkContextUtils {
             case None => fileSystem.open(hadoopPath)
           }
           try {
-            Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
+            Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => a.contains("tokstok") || a.contains("tokstok-linx")).foldLeft(ArrayBuffer.empty[String])(_ += _)
           } catch {
             case NonFatal(ex) =>
               println(s"Failed to read resource from '$path': ${ex.getMessage} -- ${ex.getFullStackTraceString}")
@@ -313,7 +313,7 @@ object SparkContextUtils {
               case Some(compression) => compression.createInputStream(fileSystem.open(hadoopPath))
               case None => fileSystem.open(hadoopPath)
             }
-            val lines = Source.fromInputStream(inputStream)(Codec.UTF8).getLines()
+            val lines = Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => a.contains("tokstok") || a.contains("tokstok-linx"))
 
             val lineSample = lines.take(sampleCount).toList
             val linesPerSlice = {
@@ -420,6 +420,7 @@ object SparkContextUtils {
           val status = fileSystem.getFileStatus(hadoopPath)
           if (status.isDirectory) {
             val sanitize = Option(fileSystem.listStatus(hadoopPath)).getOrElse(Array.empty)
+
             Option(sanitize.map(status => HadoopFile(status.getPath.toString, status.isDirectory, status.getLen)).toList)
           } else if (status.isFile) {
             Option(List(HadoopFile(status.getPath.toString, status.isDirectory, status.getLen)))
@@ -428,6 +429,7 @@ object SparkContextUtils {
           }
         } catch {
           case e: java.io.FileNotFoundException =>
+            println(s">>>> FileNotFoundException ${path}")
             None
         }
 
@@ -448,6 +450,7 @@ object SparkContextUtils {
           files ++ innerListFiles(dirs)
         }
       }
+
       innerListFiles(List(HadoopFile(path, isDir = true, 0)))
     }
 
@@ -505,12 +508,14 @@ object SparkContextUtils {
       val commonPrefixes = s3ListCommonPrefixes(splittedPath).map(classifyPath)
 
       logger.trace(s"s3NarrowPaths for $splittedPath, common prefixes: $commonPrefixes")
+
       if (commonPrefixes.isEmpty)
         Stream(WithOptDate(Try(pathDateExtractor.extractFromPath(splittedPath.join)).toOption, splittedPath))
       else
         commonPrefixes.toStream.flatMap {
           case Left(prefixWithoutDate) =>
             logger.trace(s"s3NarrowPaths prefixWithoutDate: $prefixWithoutDate")
+
             s3NarrowPaths(prefixWithoutDate, inclusiveStartDate, startDate, inclusiveEndDate, endDate, ignoreHours)
           case Right((prefixWithDate, date)) if isGoodDate(date) => Stream(WithOptDate(Option(date), prefixWithDate))
           case Right(_) => Stream.empty
@@ -556,20 +561,23 @@ object SparkContextUtils {
                            exclusionPattern: Option[String] = Option(".*_temporary.*|.*_\\$folder.*"),
                            predicate: HadoopFile => Boolean = _ => true)
                           (implicit dateExtractor: PathDateExtractor): List[HadoopFile] = {
-
-      def isSuccessFile(file: HadoopFile): Boolean =
+      def isSuccessFile(file: HadoopFile): Boolean = {
         file.path.endsWith("_SUCCESS") || file.path.endsWith("_FINISHED")
+      }
 
-      def excludePatternValidation(file: HadoopFile): Boolean =
+      def excludePatternValidation(file: HadoopFile): Boolean = {
         exclusionPattern.map(pattern => !file.path.matches(pattern)).getOrElse(true)
+      }
 
-      def endsWithValidation(file: HadoopFile): Boolean =
+      def endsWithValidation(file: HadoopFile): Boolean = {
         endsWith.map { pattern =>
           file.path.endsWith(pattern) || isSuccessFile(file)
         }.getOrElse(true)
+      }
 
       def dateValidation(files: WithOptDate[Array[HadoopFile]]): Boolean = {
         val tryDate = files.date
+
         if (tryDate.isEmpty && ignoreMalformedDates)
           true
         else if (tryDate.isEmpty)
@@ -595,6 +603,7 @@ object SparkContextUtils {
         else {
           val filtered = files.copy(value = files.value
             .filter(excludePatternValidation).filter(endsWithValidation).filter(predicate))
+
           if (filtered.value.isEmpty || !dateValidation(filtered))
             None
           else
@@ -605,10 +614,11 @@ object SparkContextUtils {
       val groupedAndSortedByDateFiles = sortedSmartList(path, inclusiveStartDate = inclusiveStartDate, inclusiveEndDate = inclusiveEndDate,
         startDate = startDate, endDate = endDate, exclusionPattern = exclusionPattern).flatMap(preValidations)
 
-      val allFiles = if (lastN.isDefined)
+      val allFiles = if (lastN.isDefined) {
         groupedAndSortedByDateFiles.take(lastN.get).flatMap(_.value)
-      else
+      } else {
         groupedAndSortedByDateFiles.flatMap(_.value)
+      }
 
       allFiles.sortBy(_.path).toList
     }
@@ -619,7 +629,6 @@ object SparkContextUtils {
                         inclusiveEndDate: Boolean = false,
                         endDate: Option[DateTime] = None,
                         exclusionPattern: Option[String] = None)(implicit pathDateExtractor: PathDateExtractor): Stream[WithOptDate[Array[HadoopFile]]] = {
-
       def toHadoopFile(s3Object: S3ObjectSummary): HadoopFile =
         HadoopFile(s"s3a://${s3Object.getBucketName}/${s3Object.getKey}", isDir = false, s3Object.getSize)
 
@@ -664,7 +673,7 @@ object SparkContextUtils {
         endDate, lastN, ignoreMalformedDates, endsWith, predicate = predicate)
 
       if (foundFiles.size < minimumFiles)
-        throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of files $foundFiles is less than the required")
+        throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but the resulting number of files $foundFiles is less than the required")
 
       parallelReadTextFiles(foundFiles, maxBytesPerPartition = maxBytesPerPartition, minPartitions = minPartitions,
         sizeBasedFileHandling = sizeBasedFileHandling, synchLocally = synchLocally, forceSynch = forceSynch)
@@ -694,6 +703,5 @@ object SparkContextUtils {
 
       sc.textFile(cacheKey)
     }
-
   }
 }

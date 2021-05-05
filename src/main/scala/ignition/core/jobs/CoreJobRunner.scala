@@ -7,6 +7,8 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
 
+import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
+
 object CoreJobRunner {
 
   val logger: Logger = LoggerFactory.getLogger(getClass)
@@ -74,11 +76,36 @@ object CoreJobRunner {
 
       val appName = s"${config.setupName}.${config.tag}"
 
-
       val builder = SparkSession.builder
+
       builder.config("spark.executor.memory", config.executorMemory)
 
       builder.config("spark.eventLog.dir", "file:///media/tmp/spark-events")
+
+      val sas = "?sv=2020-04-08&st=2021-04-30T12%3A26%3A45Z&se=2021-05-10T12%3A26%3A00Z&sr=c&sp=racwdl&sig=Zpx3A%2FEtlDpRXlyWiDXwKGnY634v8a2fbwoCc58g1lQ%3D"
+      val containerName = "mail-ignition"
+      val accountName = "reengageblob"
+
+      val mountConfig = "fs.azure.sas." + containerName+ "." + accountName + ".blob.core.windows.net"
+
+      try {
+        dbutils.fs.unmount("/mnt/teste")
+        dbutils.fs.unmount("/mnt/mail-ignition")
+        dbutils.fs.unmount("/mnt/platform-dumps-virginia")
+        dbutils.fs.unmount("/mnt/chaordic-dumps")
+      } catch {
+        case _: Throwable => println("Got some other kind of Throwable exception")
+      }
+
+      dbutils.fs.mount(s"s3a://mail-ignition", s"/mnt/mail-ignition")
+      dbutils.fs.mount(s"s3a://platform-dumps-virginia", s"/mnt/platform-dumps-virginia")
+      dbutils.fs.mount(s"s3a://chaordic-dumps", s"/mnt/chaordic-dumps")
+
+      dbutils.fs.mount(
+        source = s"wasbs://${containerName}@${accountName}.blob.core.windows.net",
+        mountPoint = "/mnt/teste",
+        extraConfigs = Map(mountConfig -> sas)
+      )
 
       builder.master(config.master)
       builder.appName(appName)
@@ -101,6 +128,7 @@ object CoreJobRunner {
       val session = builder.getOrCreate()
 
       val sc = session.sparkContext
+
       // Also try to propagate logging context to workers
       // TODO: find a more efficient and bullet-proof way
       val configBroadCast = sc.broadcast(config)
