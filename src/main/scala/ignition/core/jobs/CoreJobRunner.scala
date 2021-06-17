@@ -38,9 +38,36 @@ object CoreJobRunner {
                           executorMemory: String = "2G",
                           extraArgs: Map[String, String] = Map.empty)
 
+  def mountStorage(containerName: String): Unit = {
+    println(s"Mounting s3a://$containerName as /mnt/$containerName")
+
+    // For S3
+    dbutils.fs.mount(s"s3a://$containerName", s"/mnt/$containerName")
+  }
+
+  def mountBlobStorage(containerName: String): Unit = {
+    // For BlobStorage
+    val sas = "?sv=2020-04-08&ss=bf&srt=sco&st=2021-06-09T14%3A25%3A01Z&se=2025-12-31T14%3A25%3A00Z&sp=rwdlcu&sig=aAeOjf89E09SBs88%2FCeX8rZk4BmyRhIx51rCSs2Hhok%3D" // sys.env.getOrElse("AZ_BLOB_STORAGE_SAS", "")
+
+    val storageAccountName = "mailncdevqryv" // sys.env.getOrElse("AZ_BLOB_STORAGE_STORAGE_NAME", "")
+
+    val config = "fs.azure.sas." + containerName+ "." + storageAccountName + ".blob.core.windows.net"
+
+    val source = s"wasbs://${containerName}@${storageAccountName}.blob.core.windows.net"
+
+    println(s"Mounting $source as /mnt/$containerName")
+
+    dbutils.fs.mount(
+      source = source,
+      mountPoint = s"/mnt/$containerName",
+      extraConfigs = Map(config -> sas)
+    )
+  }
+
   def runJobSetup(args: Array[String], jobsSetups: Map[String, (CoreJobRunner.RunnerContext => Unit, Map[String, String])], defaultSparkConfMap: Map[String, String]) {
     val parser = new scopt.OptionParser[RunnerConfig]("Runner") {
       help("help") text("prints this usage text")
+      
       arg[String]("<setup-name>") required() action { (x, c) =>
         c.copy(setupName = x)
       } text(s"one of ${jobsSetups.keySet}")
@@ -49,10 +76,12 @@ object CoreJobRunner {
         c.copy(date = new DateTime(x))
       }
       opt[String]('t', "runner-tag") action { (x, c) =>
-        c.copy(tag = x)
+        c.copy(tag = DateTime.now().toString().substring(0, 19).replaceAll(":", "_").replaceAll("-", "_") + "UTC")
+        // c.copy(tag = x)
       }
       opt[String]('u', "runner-user") action { (x, c) =>
-        c.copy(user = x)
+        c.copy(user = "claudio-bordoni")
+        // c.copy(user = x)
       }
       opt[String]('m', "runner-master") action { (x, c) =>
         c.copy(master = x)
@@ -62,12 +91,15 @@ object CoreJobRunner {
       }
 
       opt[(String, String)]('w', "runner-extra") unbounded() action { (x, c) =>
+        println(s"Running with extra ${x}")
         c.copy(extraArgs = c.extraArgs ++ Map(x))
       }
     }
 
     parser.parse(args, RunnerConfig()) map { config =>
       val setup = jobsSetups.get(config.setupName)
+
+      println(s"${config.setupName} v1.1.9")
 
       require(setup.isDefined,
         s"Invalid job setup ${config.setupName}, available jobs setups: ${jobsSetups.keySet}")
@@ -82,30 +114,18 @@ object CoreJobRunner {
 
       builder.config("spark.eventLog.dir", "file:///media/tmp/spark-events")
 
-      val sas = "?sv=2020-04-08&st=2021-04-30T12%3A26%3A45Z&se=2021-05-10T12%3A26%3A00Z&sr=c&sp=racwdl&sig=Zpx3A%2FEtlDpRXlyWiDXwKGnY634v8a2fbwoCc58g1lQ%3D"
-      val containerName = "mail-ignition"
-      val accountName = "reengageblob"
-
-      val mountConfig = "fs.azure.sas." + containerName+ "." + accountName + ".blob.core.windows.net"
-
       try {
-        dbutils.fs.unmount("/mnt/teste")
-        dbutils.fs.unmount("/mnt/mail-ignition")
-        dbutils.fs.unmount("/mnt/platform-dumps-virginia")
-        dbutils.fs.unmount("/mnt/chaordic-dumps")
+        dbutils.fs.unmount(s"/mnt/mail-ignition")
+        dbutils.fs.unmount(s"/mnt/chaordic-engine")
+        dbutils.fs.unmount(s"/mnt/chaordic-dumps")
+        dbutils.fs.unmount(s"/mnt/platform-dumps-virginia")
+        dbutils.fs.unmount(s"/mnt/azure-bs-teste")
       } catch {
         case _: Throwable => println("Got some other kind of Throwable exception")
       }
 
-      dbutils.fs.mount(s"s3a://mail-ignition", s"/mnt/mail-ignition")
-      dbutils.fs.mount(s"s3a://platform-dumps-virginia", s"/mnt/platform-dumps-virginia")
-      dbutils.fs.mount(s"s3a://chaordic-dumps", s"/mnt/chaordic-dumps")
-
-      dbutils.fs.mount(
-        source = s"wasbs://${containerName}@${accountName}.blob.core.windows.net",
-        mountPoint = "/mnt/teste",
-        extraConfigs = Map(mountConfig -> sas)
-      )
+      List("mail-ignition", "chaordic-engine", "chaordic-dumps", "platform-dumps-virginia").foreach(mountStorage)
+      List("azure-bs-teste").foreach(mountBlobStorage)
 
       builder.master(config.master)
       builder.appName(appName)

@@ -263,7 +263,8 @@ object SparkContextUtils {
     private def readSmallFiles(smallFiles: List[HadoopFile],
                                maxBytesPerPartition: Long,
                                minPartitions: Int,
-                               sizeBasedFileHandling: SizeBasedFileHandling): RDD[String] = {
+                               sizeBasedFileHandling: SizeBasedFileHandling,
+                               apiKeysToProcess: Set[String] = Set.empty): RDD[String] = {
       val smallPartitionedFiles = sc.parallelize(smallFiles.map(_.path).map(file => file -> null), 2).partitionBy(createSmallFilesPartitioner(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling))
       val hadoopConf = _hadoopConf
       smallPartitionedFiles.mapPartitions { files =>
@@ -277,7 +278,11 @@ object SparkContextUtils {
             case None => fileSystem.open(hadoopPath)
           }
           try {
-            Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => a.contains("tokstok") || a.contains("tokstok-linx")).foldLeft(ArrayBuffer.empty[String])(_ += _)
+            if (apiKeysToProcess.isEmpty) {
+              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
+            } else {
+              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => apiKeysToProcess.exists(a.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
+            }
           } catch {
             case NonFatal(ex) =>
               println(s"Failed to read resource from '$path': ${ex.getMessage} -- ${ex.getFullStackTraceString}")
@@ -289,8 +294,11 @@ object SparkContextUtils {
       }
     }
 
-    private def readCompressedBigFile(file: HadoopFile, maxBytesPerPartition: Long, minPartitions: Int,
-                                      sizeBasedFileHandling: SizeBasedFileHandling, sampleCount: Int = 100): RDD[String] = {
+    private def readCompressedBigFile(file: HadoopFile,
+                                      maxBytesPerPartition: Long, minPartitions: Int,
+                                      sizeBasedFileHandling: SizeBasedFileHandling,
+                                      sampleCount: Int = 100,
+                                      apiKeysToProcess:  Set[String] = Set.empty): RDD[String] = {
       val estimatedSize = sizeBasedFileHandling.estimatedSize(file)
       val totalSlices = (estimatedSize / maxBytesPerPartition + 1).toInt
       val slices = (0 until totalSlices).map(BigFileSlice.apply)
@@ -313,7 +321,12 @@ object SparkContextUtils {
               case Some(compression) => compression.createInputStream(fileSystem.open(hadoopPath))
               case None => fileSystem.open(hadoopPath)
             }
-            val lines = Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => a.contains("tokstok") || a.contains("tokstok-linx"))
+
+            val lines = if (apiKeysToProcess.isEmpty) {
+              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
+            } else {
+              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => apiKeysToProcess.exists(a.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
+            }
 
             val lineSample = lines.take(sampleCount).toList
             val linesPerSlice = {
@@ -342,7 +355,8 @@ object SparkContextUtils {
     private def readBigFiles(bigFiles: List[HadoopFile],
                              maxBytesPerPartition: Long,
                              minPartitions: Int,
-                             sizeBasedFileHandling: SizeBasedFileHandling): RDD[String] = {
+                             sizeBasedFileHandling: SizeBasedFileHandling,
+                             apiKeysToProcess: Set[String] = Set.empty): RDD[String] = {
       def confWith(maxSplitSize: Long): Configuration = (_hadoopConf.value ++ Seq(
         "mapreduce.input.fileinputformat.split.minsize" -> maxSplitSize.toString,
         "mapreduce.input.fileinputformat.split.maxsize" -> maxSplitSize.toString))
@@ -356,7 +370,7 @@ object SparkContextUtils {
       val union = new UnionRDD(sc, bigFiles.map { file =>
 
         if (sizeBasedFileHandling.isCompressed(file))
-          readCompressedBigFile(file, maxBytesPerPartition, minPartitions, sizeBasedFileHandling)
+          readCompressedBigFile(file, maxBytesPerPartition, minPartitions, sizeBasedFileHandling, apiKeysToProcess = apiKeysToProcess)
         else
           read(file, confUncompressed)
       })
@@ -372,16 +386,18 @@ object SparkContextUtils {
                               minPartitions: Int = 100,
                               sizeBasedFileHandling: SizeBasedFileHandling = SizeBasedFileHandling(),
                               synchLocally: Option[String] = None,
-                              forceSynch: Boolean = false): RDD[String] = {
+                              forceSynch: Boolean = false,
+                              apiKeysToProcess: Set[String] = Set.empty): RDD[String] = {
       val filteredFiles = files.filter(_.size > 0)
+
       if (synchLocally.isDefined)
         doSync(filteredFiles, maxBytesPerPartition = maxBytesPerPartition, minPartitions = minPartitions, synchLocally = synchLocally.get,
           sizeBasedFileHandling = sizeBasedFileHandling, forceSynch = forceSynch)
       else {
         val (bigFiles, smallFiles) = filteredFiles.partition(f => sizeBasedFileHandling.isBig(f, maxBytesPerPartition))
         sc.union(
-          readSmallFiles(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling),
-          readBigFiles(bigFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling))
+          readSmallFiles(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling, apiKeysToProcess = apiKeysToProcess),
+          readBigFiles(bigFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling, apiKeysToProcess = apiKeysToProcess))
       }
     }
 
@@ -581,7 +597,7 @@ object SparkContextUtils {
         if (tryDate.isEmpty && ignoreMalformedDates)
           true
         else if (tryDate.isEmpty)
-          throw new Exception(s"Not date found for path $path, expanded files: ${files.value.toList}, consider using ignoreMalformedDates=true if not date is expected on this path")
+          throw new Exception(s"Not date found for path $path, expanded files: ${files.value.toList.head}, consider using ignoreMalformedDates=true if not date is expected on this path")
         else {
           val date = tryDate.get
           val goodStartDate = startDate.isEmpty || (inclusiveStartDate && date.saneEqual(startDate.get) || date.isAfter(startDate.get))
@@ -666,7 +682,8 @@ object SparkContextUtils {
                                       sizeBasedFileHandling: SizeBasedFileHandling = SizeBasedFileHandling(),
                                       minimumFiles: Int = 1,
                                       synchLocally: Option[String] = None,
-                                      forceSynch: Boolean = false)
+                                      forceSynch: Boolean = false,
+                                      apiKeysToProcess: Set[String] = Set.empty)
                                      (implicit dateExtractor: PathDateExtractor): RDD[String] = {
 
       val foundFiles = listAndFilterFiles(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate,
@@ -676,7 +693,7 @@ object SparkContextUtils {
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but the resulting number of files $foundFiles is less than the required")
 
       parallelReadTextFiles(foundFiles, maxBytesPerPartition = maxBytesPerPartition, minPartitions = minPartitions,
-        sizeBasedFileHandling = sizeBasedFileHandling, synchLocally = synchLocally, forceSynch = forceSynch)
+        sizeBasedFileHandling = sizeBasedFileHandling, synchLocally = synchLocally, forceSynch = forceSynch, apiKeysToProcess = apiKeysToProcess)
     }
 
     private def doSync(hadoopFiles: List[HadoopFile],
