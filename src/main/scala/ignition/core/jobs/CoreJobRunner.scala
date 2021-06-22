@@ -32,36 +32,36 @@ object CoreJobRunner {
 
   case class RunnerConfig(setupName: String = "nosetup",
                           date: DateTime = DateTime.now.withZone(DateTimeZone.UTC),
-                          tag: String = "notag",
+                          tag: String = DateTime.now.withZone(DateTimeZone.UTC).toString().substring(0, 19).replaceAll(":", "_").replaceAll("-", "_") + "UTC",
                           user: String = "nouser",
                           master: String = "local[*]",
                           executorMemory: String = "2G",
                           extraArgs: Map[String, String] = Map.empty)
 
-  def mountStorage(containerName: String): Unit = {
-    println(s"Mounting s3a://$containerName as /mnt/$containerName")
-
-    // For S3
-    dbutils.fs.mount(s"s3a://$containerName", s"/mnt/$containerName")
+  def mountStorage(containerName: String)(implicit mounts: Seq[String]): Unit = {
+    if (!mounts.contains(s"/mnt/$containerName")) {
+      println(s"Mounting s3a://$containerName as /mnt/$containerName")
+      dbutils.fs.mount(s"s3a://$containerName", s"/mnt/$containerName")
+    }
   }
 
-  def mountBlobStorage(containerName: String): Unit = {
-    // For BlobStorage
-    val sas = "?sv=2020-04-08&ss=bf&srt=sco&st=2021-06-09T14%3A25%3A01Z&se=2025-12-31T14%3A25%3A00Z&sp=rwdlcu&sig=aAeOjf89E09SBs88%2FCeX8rZk4BmyRhIx51rCSs2Hhok%3D" // sys.env.getOrElse("AZ_BLOB_STORAGE_SAS", "")
+  def mountBlobStorage(containerName: String)(implicit mounts: Seq[String]): Unit = {
+    if (!mounts.contains(s"/mnt/$containerName")) {
+      val sas = "?sv=2020-04-08&ss=bf&srt=sco&st=2021-06-09T14%3A25%3A01Z&se=2025-12-31T14%3A25%3A00Z&sp=rwdlcu&sig=aAeOjf89E09SBs88%2FCeX8rZk4BmyRhIx51rCSs2Hhok%3D" // sys.env.getOrElse("AZ_BLOB_STORAGE_SAS", "")
 
-    val storageAccountName = "mailncdevqryv" // sys.env.getOrElse("AZ_BLOB_STORAGE_STORAGE_NAME", "")
+      val storageAccountName = "mailncdevqryv"
 
-    val config = "fs.azure.sas." + containerName+ "." + storageAccountName + ".blob.core.windows.net"
+      val config = "fs.azure.sas." + containerName+ "." + storageAccountName + ".blob.core.windows.net"
 
-    val source = s"wasbs://${containerName}@${storageAccountName}.blob.core.windows.net"
+      val source = s"wasbs://${containerName}@${storageAccountName}.blob.core.windows.net"
 
-    println(s"Mounting $source as /mnt/$containerName")
-
-    dbutils.fs.mount(
-      source = source,
-      mountPoint = s"/mnt/$containerName",
-      extraConfigs = Map(config -> sas)
-    )
+      println(s"Mounting $source as /mnt/$containerName")
+      dbutils.fs.mount(
+        source = source,
+        mountPoint = s"/mnt/$containerName",
+        extraConfigs = Map(config -> sas)
+      )
+    }
   }
 
   def runJobSetup(args: Array[String], jobsSetups: Map[String, (CoreJobRunner.RunnerContext => Unit, Map[String, String])], defaultSparkConfMap: Map[String, String]) {
@@ -91,7 +91,6 @@ object CoreJobRunner {
       }
 
       opt[(String, String)]('w', "runner-extra") unbounded() action { (x, c) =>
-        println(s"Running with extra ${x}")
         c.copy(extraArgs = c.extraArgs ++ Map(x))
       }
     }
@@ -99,7 +98,9 @@ object CoreJobRunner {
     parser.parse(args, RunnerConfig()) map { config =>
       val setup = jobsSetups.get(config.setupName)
 
-      println(s"${config.setupName} v1.1.9")
+      println(s"${config.setupName} v1.1.29")
+      println(s"Running with extra ${config.extraArgs}")
+      println(s"Running with tag ${config.tag}")
 
       require(setup.isDefined,
         s"Invalid job setup ${config.setupName}, available jobs setups: ${jobsSetups.keySet}")
@@ -114,6 +115,7 @@ object CoreJobRunner {
 
       builder.config("spark.eventLog.dir", "file:///media/tmp/spark-events")
 
+      /*
       try {
         dbutils.fs.unmount(s"/mnt/mail-ignition")
         dbutils.fs.unmount(s"/mnt/chaordic-engine")
@@ -123,6 +125,9 @@ object CoreJobRunner {
       } catch {
         case _: Throwable => println("Got some other kind of Throwable exception")
       }
+      */
+
+      implicit val mounts: Seq[String] = dbutils.fs.mounts().map(_.mountPoint)
 
       List("mail-ignition", "chaordic-engine", "chaordic-dumps", "platform-dumps-virginia").foreach(mountStorage)
       List("azure-bs-teste").foreach(mountBlobStorage)
