@@ -98,7 +98,7 @@ object CoreJobRunner {
     parser.parse(args, RunnerConfig()) map { config =>
       val setup = jobsSetups.get(config.setupName)
 
-      println(s"${config.setupName} v1.1.29")
+      println(s"${config.setupName} v1.1.30")
       println(s"Running with extra ${config.extraArgs}")
       println(s"Running with tag ${config.tag}")
 
