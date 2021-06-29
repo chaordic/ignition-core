@@ -61,7 +61,7 @@ object SparkContextUtils {
   }
 
   object S3SplittedPath {
-    val s3Pattern = "s3[an]?://([^/]+)(.+)".r
+    val s3Pattern = ".*://?([^/]+)(.+)".r
 
     def from(fullPath: String): Option[S3SplittedPath] =
       fullPath match {
@@ -174,12 +174,15 @@ object SparkContextUtils {
     }
 
     // Atualizar protocolo
-    lazy val hdfsPathPrefix = sc.master.replaceFirst("spark://(.*):7077", "hdfs://$1:9000/")
+
+    lazy val hdfsPathPrefix = "dbfs:/mnt/userHistory" //.replaceFirst("spark://(.*):7077", "hdfs://$1:9000/")
 
     def synchToHdfs(paths: Seq[String], pathsToRdd: (Seq[String], Int) => RDD[String], forceSynch: Boolean): Seq[String] = {
       val filesToOutput = 1500
       def mapPaths(actionWhenNeedsSynching: (String, String) => Unit): Seq[String] = {
         paths.map(p => {
+          //TODO acredito que essa função não seja usada
+          println("synchToHdfs funcao nao usada")
           val hdfsPath = p.replaceFirst("s3[an]://", hdfsPathPrefix)
           if (forceSynch || getStatus(hdfsPath, false).isEmpty || getStatus(s"$hdfsPath/*", true).filterNot(_.isDirectory).size != filesToOutput) {
             actionWhenNeedsSynching(p, hdfsPath)
@@ -653,7 +656,7 @@ object SparkContextUtils {
         else {
           val filtered = files.copy(value = files.value
             .filter(excludePatternValidation).filter(endsWithValidation).filter(predicate))
-
+          //TODO validation não faz sentido
           if (filtered.value.isEmpty || !dateValidation(filtered))
             None
           else
