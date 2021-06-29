@@ -1,7 +1,6 @@
 package ignition.core.jobs.utils
 
 import java.io.InputStream
-
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain
 import com.amazonaws.services.s3.model.{ListObjectsRequest, ObjectListing, S3ObjectSummary}
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3Client}
@@ -16,7 +15,8 @@ import org.apache.hadoop.io.{LongWritable, Text}
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat
 import org.apache.spark.rdd.{RDD, UnionRDD}
 import org.apache.spark.{Partitioner, SparkContext}
-import org.joda.time.DateTime
+import org.joda.time.{DateTime, DateTimeZone}
+import org.joda.time.format.DateTimeFormat
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
@@ -437,7 +437,7 @@ object SparkContextUtils {
       goodStartDate && goodEndDate
     }
 
-    private def executeDriverList(paths: Seq[String], startDate: Option[DateTime], endDate: Option[DateTime])(implicit pathDateExtractor: PathDateExtractor): List[HadoopFile] = {
+    private def executeDriverList(paths: Seq[String], startDate: Option[DateTime], endDate: Option[DateTime], apiKeysToProcess: Set[String] = Set.empty)(implicit pathDateExtractor: PathDateExtractor): List[HadoopFile] = {
       val conf = _hadoopConf.value.foldLeft(new Configuration()) { case (acc, (k, v)) => acc.set(k, v); acc }
 
       paths.flatMap { path =>
@@ -447,24 +447,30 @@ object SparkContextUtils {
           val status = fileSystem.getFileStatus(hadoopPath)
 
           if (status.isDirectory) {
+            var shouldList = true
+
             val folderPath = status.getPath.toString
 
             val dateTime = Try { pathDateExtractor.extractFromPath(folderPath) }.toOption
 
             if (startDate.isDefined && endDate.isDefined && dateTime.isDefined) {
-              if (isGoodDate(dateTime.get, startDate.get, endDate.get)) {
-                val sanitize = Option(fileSystem.listStatus(hadoopPath)).getOrElse(Array.empty)
-
-                Option(sanitize.map(status => HadoopFile(status.getPath.toString, status.isDirectory, status.getLen)).toList)
-              } else {
-                None
-              }
+              shouldList = isGoodDate(dateTime.get, startDate.get, endDate.get)
             } else {
               logger.info(s"No date found for path ${folderPath}")
+            }
 
-              val sanitize = Option(fileSystem.listStatus(hadoopPath)).getOrElse(Array.empty)
+            if (shouldList) {
+              val sanitize = fileSystem.listStatus(hadoopPath)
 
-              Option(sanitize.map(status => HadoopFile(status.getPath.toString, status.isDirectory, status.getLen)).toList)
+              val sanitized = sanitize.map(status => HadoopFile(status.getPath.toString, status.isDirectory, status.getLen)).toList
+
+              if (apiKeysToProcess.nonEmpty && sanitized.exists(file => apiKeysToProcess.exists(file.path.contains))) {
+                Option(sanitized.filter(file => apiKeysToProcess.exists(file.path.contains)))
+              } else {
+                Option(sanitized)
+              }
+            } else {
+              None
             }
           } else if (status.isFile) {
             Option(List(HadoopFile(status.getPath.toString, status.isDirectory, status.getLen)))
@@ -481,12 +487,12 @@ object SparkContextUtils {
       }.toList
     }
 
-    private def driverListFiles(path: String, startDate: Option[DateTime], endDate: Option[DateTime])(implicit pathDateExtractor: PathDateExtractor): List[HadoopFile] = {
+    private def driverListFiles(path: String, startDate: Option[DateTime], endDate: Option[DateTime], apiKeysToProcess: Set[String] = Set.empty)(implicit pathDateExtractor: PathDateExtractor): List[HadoopFile] = {
       def innerListFiles(remainingDirectories: List[HadoopFile]): List[HadoopFile] = {
         if (remainingDirectories.isEmpty) {
           Nil
         } else {
-          val (dirs, files) = executeDriverList(remainingDirectories.map(_.path), startDate, endDate).partition(_.isDir)
+          val (dirs, files) = executeDriverList(remainingDirectories.map(_.path), startDate, endDate, apiKeysToProcess).partition(_.isDir)
           files ++ innerListFiles(dirs)
         }
       }
@@ -599,7 +605,8 @@ object SparkContextUtils {
                            ignoreMalformedDates: Boolean = false,
                            endsWith: Option[String] = None,
                            exclusionPattern: Option[String] = Option(".*_temporary.*|.*_\\$folder.*"),
-                           predicate: HadoopFile => Boolean = _ => true)
+                           predicate: HadoopFile => Boolean = _ => true,
+                           apiKeysToProcess: Set[String] = Set.empty)
                           (implicit dateExtractor: PathDateExtractor): List[HadoopFile] = {
       def isSuccessFile(file: HadoopFile): Boolean = {
         file.path.endsWith("_SUCCESS") || file.path.endsWith("_FINISHED")
@@ -652,7 +659,7 @@ object SparkContextUtils {
       }
 
       val groupedAndSortedByDateFiles = sortedSmartList(path, inclusiveStartDate = inclusiveStartDate, inclusiveEndDate = inclusiveEndDate,
-        startDate = startDate, endDate = endDate, exclusionPattern = exclusionPattern).flatMap(preValidations)
+        startDate = startDate, endDate = endDate, exclusionPattern = exclusionPattern, apiKeysToProcess = apiKeysToProcess).flatMap(preValidations)
 
       val allFiles = if (lastN.isDefined) {
         groupedAndSortedByDateFiles.take(lastN.get).flatMap(_.value)
@@ -668,7 +675,8 @@ object SparkContextUtils {
                         startDate: Option[DateTime] = None,
                         inclusiveEndDate: Boolean = false,
                         endDate: Option[DateTime] = None,
-                        exclusionPattern: Option[String] = None)(implicit pathDateExtractor: PathDateExtractor): Stream[WithOptDate[Array[HadoopFile]]] = {
+                        exclusionPattern: Option[String] = None,
+                        apiKeysToProcess: Set[String] = Set.empty)(implicit pathDateExtractor: PathDateExtractor): Stream[WithOptDate[Array[HadoopFile]]] = {
       def toHadoopFile(s3Object: S3ObjectSummary): HadoopFile =
         HadoopFile(s"s3a://${s3Object.getBucketName}/${s3Object.getKey}", isDir = false, s3Object.getSize)
 
@@ -679,7 +687,7 @@ object SparkContextUtils {
             case WithOptDate(date, paths) => WithOptDate(date, paths.map(toHadoopFile).toArray)
           }
         } else {
-          val pathsWithDate: Stream[WithOptDate[Iterable[HadoopFile]]] = driverListFiles(path, startDate, endDate)
+          val pathsWithDate: Stream[WithOptDate[Iterable[HadoopFile]]] = driverListFiles(path, startDate, endDate, apiKeysToProcess)
             .map(p => (Try { pathDateExtractor.extractFromPath(p.path) }.toOption, p))
             .groupByKey()
             .map { case (date, path) => WithOptDate(date, path) }
@@ -711,7 +719,7 @@ object SparkContextUtils {
                                      (implicit dateExtractor: PathDateExtractor): RDD[String] = {
 
       val foundFiles = listAndFilterFiles(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate,
-        endDate, lastN, ignoreMalformedDates, endsWith, predicate = predicate)
+        endDate, lastN, ignoreMalformedDates, endsWith, predicate = predicate, apiKeysToProcess = apiKeysToProcess)
 
       logger.info(s"Found ${foundFiles.length} files")
 

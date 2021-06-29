@@ -2,6 +2,8 @@
 *.log
 .classpath
 .settings
+.metals
+.vscode
 
 # sbt specific
 .cache/
