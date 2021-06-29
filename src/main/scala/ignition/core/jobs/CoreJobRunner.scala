@@ -76,12 +76,10 @@ object CoreJobRunner {
         c.copy(date = new DateTime(x))
       }
       opt[String]('t', "runner-tag") action { (x, c) =>
-        c.copy(tag = DateTime.now().toString().substring(0, 19).replaceAll(":", "_").replaceAll("-", "_") + "UTC")
-        // c.copy(tag = x)
+        c.copy(tag = x)
       }
       opt[String]('u', "runner-user") action { (x, c) =>
-        c.copy(user = "claudio-bordoni")
-        // c.copy(user = x)
+        c.copy(user = x)
       }
       opt[String]('m', "runner-master") action { (x, c) =>
         c.copy(master = x)
@@ -98,7 +96,6 @@ object CoreJobRunner {
     parser.parse(args, RunnerConfig()) map { config =>
       val setup = jobsSetups.get(config.setupName)
 
-      println(s"${config.setupName} v1.1.30")
       println(s"Running with extra ${config.extraArgs}")
       println(s"Running with tag ${config.tag}")
 
