@@ -265,7 +265,7 @@ object SparkContextUtils {
                                maxBytesPerPartition: Long,
                                minPartitions: Int,
                                sizeBasedFileHandling: SizeBasedFileHandling,
-                               apiKeysToProcess: Set[String] = Set.empty): RDD[String] = {
+                               innerFilter: Set[String] = Set.empty): RDD[String] = {
       val smallPartitionedFiles = sc.parallelize(smallFiles.map(_.path).map(file => file -> null), 2).partitionBy(createSmallFilesPartitioner(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling))
       val hadoopConf = _hadoopConf
       smallPartitionedFiles.mapPartitions { files =>
@@ -279,10 +279,10 @@ object SparkContextUtils {
             case None => fileSystem.open(hadoopPath)
           }
           try {
-            if (apiKeysToProcess.isEmpty) {
-              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
+            if (innerFilter.nonEmpty) {
+              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => innerFilter.exists(a.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
             } else {
-              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => apiKeysToProcess.exists(a.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
+              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
             }
           } catch {
             case NonFatal(ex) =>
@@ -299,7 +299,7 @@ object SparkContextUtils {
                                       maxBytesPerPartition: Long, minPartitions: Int,
                                       sizeBasedFileHandling: SizeBasedFileHandling,
                                       sampleCount: Int = 100,
-                                      apiKeysToProcess:  Set[String] = Set.empty): RDD[String] = {
+                                      innerFilter: Set[String] = Set.empty): RDD[String] = {
       val estimatedSize = sizeBasedFileHandling.estimatedSize(file)
       val totalSlices = (estimatedSize / maxBytesPerPartition + 1).toInt
       val slices = (0 until totalSlices).map(BigFileSlice.apply)
@@ -323,10 +323,10 @@ object SparkContextUtils {
               case None => fileSystem.open(hadoopPath)
             }
 
-            val lines = if (apiKeysToProcess.isEmpty) {
+            val lines = if (innerFilter.isEmpty) {
               Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
             } else {
-              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => apiKeysToProcess.exists(a.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
+              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => innerFilter.exists(a.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
             }
 
             val lineSample = lines.take(sampleCount).toList
@@ -357,7 +357,7 @@ object SparkContextUtils {
                              maxBytesPerPartition: Long,
                              minPartitions: Int,
                              sizeBasedFileHandling: SizeBasedFileHandling,
-                             apiKeysToProcess: Set[String] = Set.empty): RDD[String] = {
+                             innerFilter: Set[String] = Set.empty): RDD[String] = {
       def confWith(maxSplitSize: Long): Configuration = (_hadoopConf.value ++ Seq(
         "mapreduce.input.fileinputformat.split.minsize" -> maxSplitSize.toString,
         "mapreduce.input.fileinputformat.split.maxsize" -> maxSplitSize.toString))
@@ -371,7 +371,7 @@ object SparkContextUtils {
       val union = new UnionRDD(sc, bigFiles.map { file =>
 
         if (sizeBasedFileHandling.isCompressed(file))
-          readCompressedBigFile(file, maxBytesPerPartition, minPartitions, sizeBasedFileHandling, apiKeysToProcess = apiKeysToProcess)
+          readCompressedBigFile(file, maxBytesPerPartition, minPartitions, sizeBasedFileHandling, innerFilter = innerFilter)
         else
           read(file, confUncompressed)
       })
@@ -388,7 +388,7 @@ object SparkContextUtils {
                               sizeBasedFileHandling: SizeBasedFileHandling = SizeBasedFileHandling(),
                               synchLocally: Option[String] = None,
                               forceSynch: Boolean = false,
-                              apiKeysToProcess: Set[String] = Set.empty): RDD[String] = {
+                              innerFilter: Set[String] = Set.empty): RDD[String] = {
       val filteredFiles = files.filter(_.size > 0)
 
       if (synchLocally.isDefined)
@@ -397,8 +397,8 @@ object SparkContextUtils {
       else {
         val (bigFiles, smallFiles) = filteredFiles.partition(f => sizeBasedFileHandling.isBig(f, maxBytesPerPartition))
         sc.union(
-          readSmallFiles(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling, apiKeysToProcess = apiKeysToProcess),
-          readBigFiles(bigFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling, apiKeysToProcess = apiKeysToProcess))
+          readSmallFiles(smallFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling, innerFilter),
+          readBigFiles(bigFiles, maxBytesPerPartition, minPartitions, sizeBasedFileHandling, innerFilter))
       }
     }
 
@@ -461,11 +461,14 @@ object SparkContextUtils {
 
             if (shouldList) {
               val sanitize = fileSystem.listStatus(hadoopPath)
-
               val sanitized = sanitize.map(status => HadoopFile(status.getPath.toString, status.isDirectory, status.getLen)).toList
 
-              if (apiKeysToProcess.nonEmpty && sanitized.exists(file => apiKeysToProcess.exists(file.path.contains))) {
-                Option(sanitized.filter(file => apiKeysToProcess.exists(file.path.contains)))
+              if (apiKeysToProcess.exists(apiKey => sanitized.exists(hadoopFile => hadoopFile.path.contains(apiKey)))) {
+                val filtered = sanitized.filter(file => file.path.endsWith("_SUCCESS") || file.path.endsWith("_FINISHED") || apiKeysToProcess.exists(file.path.contains))
+
+                filtered.filter(file => file.isDir).foreach(file => logger.info(s"Adding ${file.path} to dirs list"))
+
+                Option(filtered)
               } else {
                 Option(sanitized)
               }
@@ -715,19 +718,18 @@ object SparkContextUtils {
                                       minimumFiles: Int = 1,
                                       synchLocally: Option[String] = None,
                                       forceSynch: Boolean = false,
-                                      apiKeysToProcess: Set[String] = Set.empty)
+                                      apiKeysToProcess: Set[String] = Set.empty,
+                                      innerFilter: Set[String] = Set.empty)
                                      (implicit dateExtractor: PathDateExtractor): RDD[String] = {
 
       val foundFiles = listAndFilterFiles(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate,
         endDate, lastN, ignoreMalformedDates, endsWith, predicate = predicate, apiKeysToProcess = apiKeysToProcess)
 
-      logger.info(s"Found ${foundFiles.length} files")
-
       if (foundFiles.size < minimumFiles)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but the resulting number of files $foundFiles is less than the required")
 
       parallelReadTextFiles(foundFiles, maxBytesPerPartition = maxBytesPerPartition, minPartitions = minPartitions,
-        sizeBasedFileHandling = sizeBasedFileHandling, synchLocally = synchLocally, forceSynch = forceSynch, apiKeysToProcess = apiKeysToProcess)
+        sizeBasedFileHandling = sizeBasedFileHandling, synchLocally = synchLocally, forceSynch = forceSynch, innerFilter = innerFilter)
     }
 
     private def doSync(hadoopFiles: List[HadoopFile],
