@@ -280,7 +280,7 @@ object SparkContextUtils {
           }
           try {
             if (innerFilter.nonEmpty) {
-              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => innerFilter.exists(a.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
+              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(line => innerFilter.exists(line.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
             } else {
               Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
             }
@@ -326,7 +326,7 @@ object SparkContextUtils {
             val lines = if (innerFilter.isEmpty) {
               Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
             } else {
-              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(a => innerFilter.exists(a.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
+              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(line => innerFilter.exists(line.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
             }
 
             val lineSample = lines.take(sampleCount).toList
@@ -482,7 +482,7 @@ object SparkContextUtils {
           }
         } catch {
           case e: java.io.FileNotFoundException =>
-            println(s"FileNotFoundException ${path}")
+            logger.info(s"FileNotFoundException ${path}")
             None
         }
 

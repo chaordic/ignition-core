@@ -96,7 +96,7 @@ object CoreJobRunner {
     parser.parse(args, RunnerConfig()) map { config =>
       val setup = jobsSetups.get(config.setupName)
 
-      println(s"Running with extra ${config.extraArgs}")
+      println(s"Running ${config.setupName} with extra ${config.extraArgs}")
       println(s"Running with tag ${config.tag}")
 
       require(setup.isDefined,
