@@ -73,7 +73,7 @@ object CoreJobRunner {
       } text(s"one of ${jobsSetups.keySet}")
       // Note: we use runner-option name because when passing args to spark-submit we need to avoid name conflicts
       opt[String]('d', "runner-date") action { (x, c) =>
-        c.copy(date = new DateTime(x))
+        c.copy(date = new DateTime(x).withZone(DateTimeZone.UTC))
       }
       opt[String]('t', "runner-tag") action { (x, c) =>
         c.copy(tag = x)
@@ -111,18 +111,6 @@ object CoreJobRunner {
       builder.config("spark.executor.memory", config.executorMemory)
 
       builder.config("spark.eventLog.dir", "file:///media/tmp/spark-events")
-
-      /*
-      try {
-        dbutils.fs.unmount(s"/mnt/mail-ignition")
-        dbutils.fs.unmount(s"/mnt/chaordic-engine")
-        dbutils.fs.unmount(s"/mnt/chaordic-dumps")
-        dbutils.fs.unmount(s"/mnt/platform-dumps-virginia")
-        dbutils.fs.unmount(s"/mnt/azure-bs-teste")
-      } catch {
-        case _: Throwable => println("Got some other kind of Throwable exception")
-      }
-      */
 
       implicit val mounts: Seq[String] = dbutils.fs.mounts().map(_.mountPoint)
 
