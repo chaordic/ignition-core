@@ -40,7 +40,6 @@ object CoreJobRunner {
 
   def mountStorage(containerName: String)(implicit mounts: Seq[String]): Unit = {
     if (!mounts.contains(s"/mnt/$containerName")) {
-      println(s"Mounting s3a://$containerName as /mnt/$containerName")
       dbutils.fs.mount(s"s3a://$containerName", s"/mnt/$containerName")
     }
   }
@@ -55,7 +54,6 @@ object CoreJobRunner {
 
       val source = s"wasbs://${containerName}@${storageAccountName}.blob.core.windows.net"
 
-      println(s"Mounting $source as /mnt/$containerName")
       dbutils.fs.mount(
         source = source,
         mountPoint = s"/mnt/$containerName",
@@ -115,6 +113,7 @@ object CoreJobRunner {
       implicit val mounts: Seq[String] = dbutils.fs.mounts().map(_.mountPoint)
 
       List("mail-ignition", "chaordic-engine", "chaordic-dumps", "platform-dumps-virginia").foreach(mountStorage)
+      //TODO: Remover após refatoração
       List("azure-bs-teste").foreach(mountBlobStorage)
 
       builder.master(config.master)

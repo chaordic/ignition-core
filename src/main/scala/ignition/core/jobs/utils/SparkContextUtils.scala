@@ -173,7 +173,6 @@ object SparkContextUtils {
       filterPaths(paths, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
     }
 
-    // Atualizar protocolo
     lazy val hdfsPathPrefix = sc.master.replaceFirst("spark://(.*):7077", "hdfs://$1:9000/")
 
     def synchToHdfs(paths: Seq[String], pathsToRdd: (Seq[String], Int) => RDD[String], forceSynch: Boolean): Seq[String] = {
@@ -279,11 +278,9 @@ object SparkContextUtils {
             case None => fileSystem.open(hadoopPath)
           }
           try {
-            if (innerFilter.nonEmpty) {
-              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(line => innerFilter.exists(line.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
-            } else {
-              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
-            }
+            Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(line => innerFilter.isEmpty || innerFilter.exists(line.contains))
+              .foldLeft(ArrayBuffer.empty[String])(_ += _)
+
           } catch {
             case NonFatal(ex) =>
               println(s"Failed to read resource from '$path': ${ex.getMessage} -- ${ex.getFullStackTraceString}")
@@ -323,11 +320,8 @@ object SparkContextUtils {
               case None => fileSystem.open(hadoopPath)
             }
 
-            val lines = if (innerFilter.isEmpty) {
-              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().foldLeft(ArrayBuffer.empty[String])(_ += _)
-            } else {
-              Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(line => innerFilter.exists(line.contains)).foldLeft(ArrayBuffer.empty[String])(_ += _)
-            }
+            val lines = Source.fromInputStream(inputStream)(Codec.UTF8).getLines().filter(line => innerFilter.isEmpty || innerFilter.exists(line.contains))
+              .foldLeft(ArrayBuffer.empty[String])(_ += _)
 
             val lineSample = lines.take(sampleCount).toList
             val linesPerSlice = {
@@ -466,6 +460,7 @@ object SparkContextUtils {
               if (apiKeysToProcess.exists(apiKey => sanitized.exists(hadoopFile => hadoopFile.path.contains(apiKey)))) {
                 val filtered = sanitized.filter(file => file.path.endsWith("_SUCCESS") || file.path.endsWith("_FINISHED") || apiKeysToProcess.exists(file.path.contains))
 
+                // TODO: Remover após refatoração
                 filtered.filter(file => file.isDir).foreach(file => logger.info(s"Adding ${file.path} to dirs list"))
 
                 Option(filtered)
