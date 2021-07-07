@@ -44,12 +44,10 @@ object CoreJobRunner {
     }
   }
 
-  def mountBlobStorage(containerName: String)(implicit mounts: Seq[String]): Unit = {
+  def mountBlobStorage(containerName: String, sas: String)(implicit mounts: Seq[String]): Unit = {
     if (!mounts.contains(s"/mnt/$containerName")) {
-      val sas = "?sv=2020-04-08&ss=bf&srt=sco&st=2021-06-09T14%3A25%3A01Z&se=2025-12-31T14%3A25%3A00Z&sp=rwdlcu&sig=aAeOjf89E09SBs88%2FCeX8rZk4BmyRhIx51rCSs2Hhok%3D" // sys.env.getOrElse("AZ_BLOB_STORAGE_SAS", "")
-
+      // TODO: Get sas from env
       val storageAccountName = "mailncdevqryv"
-
       val config = "fs.azure.sas." + containerName+ "." + storageAccountName + ".blob.core.windows.net"
 
       val source = s"wasbs://${containerName}@${storageAccountName}.blob.core.windows.net"
@@ -113,8 +111,11 @@ object CoreJobRunner {
       implicit val mounts: Seq[String] = dbutils.fs.mounts().map(_.mountPoint)
 
       List("mail-ignition", "chaordic-engine", "chaordic-dumps", "platform-dumps-virginia").foreach(mountStorage)
+
       //TODO: Remover após refatoração
-      List("azure-bs-teste").foreach(mountBlobStorage)
+
+      mountBlobStorage("mail-ignition-sync", "?sp=racwdl&st=2021-07-07T13:21:06Z&se=2025-07-07T21:21:06Z&spr=https&sv=2020-02-10&sr=c&sig=NeMFZeR0%2Fa60Ga6qv8d%2FjxWONZ5XNwKRf16XSMLQSgY%3D")
+      mountBlobStorage("load-products-sync", "?sp=racwdl&st=2021-07-07T13:19:21Z&se=2025-07-07T21:19:21Z&spr=https&sv=2020-02-10&sr=c&sig=b%2Fs3fu8BTnJM1CV1B8VYFEf2CGLkppMhvPRiXPHy2sE%3D")
 
       builder.master(config.master)
       builder.appName(appName)
