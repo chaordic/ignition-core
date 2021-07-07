@@ -30,3 +30,5 @@ libraryDependencies += "org.joda" % "joda-convert" % "1.8.2"
 libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.25"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.3"
+
+libraryDependencies += "com.databricks" %% "dbutils-api" % "0.0.5"
