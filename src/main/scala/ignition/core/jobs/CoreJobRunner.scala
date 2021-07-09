@@ -36,7 +36,8 @@ object CoreJobRunner {
                           user: String = "nouser",
                           master: String = "local[*]",
                           executorMemory: String = "2G",
-                          extraArgs: Map[String, String] = Map.empty)
+                          extraArgs: Map[String, String] = Map.empty,
+                          apiKeys: Set[String] = Set.empty)
 
   def mountStorage(containerName: String)(implicit mounts: Seq[String]): Unit = {
     if (!mounts.contains(s"/mnt/$containerName")) {
@@ -45,9 +46,10 @@ object CoreJobRunner {
   }
 
   def mountBlobStorage(containerName: String, sas: String)(implicit mounts: Seq[String]): Unit = {
-    if (!mounts.contains(s"/mnt/$containerName")) {
+    if (!mounts.contains(s"/mnt/$containerName") && sas.nonEmpty) {
       // TODO: Get sas from env
-      val storageAccountName = "mailncdevqryv"
+      val storageAccountName = sys.env.getOrElse("STORAGE_ACCOUNT_NAME", None)
+
       val config = "fs.azure.sas." + containerName+ "." + storageAccountName + ".blob.core.windows.net"
 
       val source = s"wasbs://${containerName}@${storageAccountName}.blob.core.windows.net"
@@ -92,11 +94,23 @@ object CoreJobRunner {
     parser.parse(args, RunnerConfig()) map { config =>
       val setup = jobsSetups.get(config.setupName)
 
-      println(s"Running ${config.setupName} with extra ${config.extraArgs}")
+      println(s"Running ${config.setupName}")
       println(s"Running with tag ${config.tag}")
 
       require(setup.isDefined,
         s"Invalid job setup ${config.setupName}, available jobs setups: ${jobsSetups.keySet}")
+
+      val clients = config.extraArgs.getOrElse("clients", "");
+
+      if (clients.nonEmpty && clients != "*") {
+        val parsedClients: Set[String] = clients.split(/,/).toSet
+
+        if (parsedClients.nonEmpty) {
+          config.copy(apiKeys = parsedClients)
+
+          println(s"Running for clients ${config.apiKeys}")
+        }
+      }
 
       val Some((jobSetup, jobConf)) = setup
 
@@ -110,17 +124,19 @@ object CoreJobRunner {
 
       implicit val mounts: Seq[String] = dbutils.fs.mounts().map(_.mountPoint)
 
-      List("mail-ignition", "chaordic-engine", "chaordic-dumps", "platform-dumps-virginia").foreach(mountStorage)
+      List("chaordic-engine", "chaordic-dumps").foreach(mountStorage)
 
+      mountBlobStorage("mail-ignition-sync", sys.env.getOrElse("USER_HISTORY_SAS", None))
+      mountBlobStorage("load-products-sync", sys.env.getOrElse("PLATFORM_PRODUCTS_SAS", None))
       //TODO: Remover após refatoração
+      mountBlobStorage("azure-bs-teste", sys.env.getOrElse("BLOB_OUTPUT_SAS", None))
 
-      mountBlobStorage("mail-ignition-sync", "?sp=racwdl&st=2021-07-07T13:21:06Z&se=2025-07-07T21:21:06Z&spr=https&sv=2020-02-10&sr=c&sig=NeMFZeR0%2Fa60Ga6qv8d%2FjxWONZ5XNwKRf16XSMLQSgY%3D")
-      mountBlobStorage("load-products-sync", "?sp=racwdl&st=2021-07-07T13:19:21Z&se=2025-07-07T21:19:21Z&spr=https&sv=2020-02-10&sr=c&sig=b%2Fs3fu8BTnJM1CV1B8VYFEf2CGLkppMhvPRiXPHy2sE%3D")
+      //TODO: Montar chaordic-dumps-sync apontando para o bucket s3://chaordic-dumps
 
       builder.master(config.master)
       builder.appName(appName)
 
-      builder.config("spark.hadoop.mapred.output.committer.class", classOf[DirectOutputCommitter].getName())
+      // builder.config("spark.hadoop.mapred.output.committer.class", classOf[DirectOutputCommitter].getName())
 
       defaultSparkConfMap.foreach { case (k, v) => builder.config(k, v) }
 
