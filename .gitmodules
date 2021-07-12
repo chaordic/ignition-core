@@ -1,4 +1,0 @@
-[submodule "tools/flintrock"]
-	path = tools/flintrock
-	url = git@github.com:chaordic/flintrock.git
-	branch = ignition_v1
