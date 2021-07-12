@@ -48,7 +48,7 @@ object CoreJobRunner {
   def mountBlobStorage(containerName: String, sas: String)(implicit mounts: Seq[String]): Unit = {
     if (!mounts.contains(s"/mnt/$containerName") && sas.nonEmpty) {
       // TODO: Get sas from env
-      val storageAccountName = sys.env.getOrElse("STORAGE_ACCOUNT_NAME", None)
+      val storageAccountName = sys.env.getOrElse("STORAGE_ACCOUNT_NAME", "")
 
       val config = "fs.azure.sas." + containerName+ "." + storageAccountName + ".blob.core.windows.net"
 
@@ -85,7 +85,9 @@ object CoreJobRunner {
       opt[String]('e', "runner-executor-memory") action { (x, c) =>
         c.copy(executorMemory = x)
       }
-
+      opt[String]('a', "runner-apikeys") action { (x, c) =>
+        c.copy(apiKeys = if (x != "*") x.split(",").toSet else Set.empty)
+      }
       opt[(String, String)]('w', "runner-extra") unbounded() action { (x, c) =>
         c.copy(extraArgs = c.extraArgs ++ Map(x))
       }
@@ -94,22 +96,14 @@ object CoreJobRunner {
     parser.parse(args, RunnerConfig()) map { config =>
       val setup = jobsSetups.get(config.setupName)
 
-      println(s"Running ${config.setupName}")
-      println(s"Running with tag ${config.tag}")
-
       require(setup.isDefined,
         s"Invalid job setup ${config.setupName}, available jobs setups: ${jobsSetups.keySet}")
 
-      val clients = config.extraArgs.getOrElse("clients", "");
+      println(s"Running ${config.setupName}")
+      println(s"Running with tag ${config.tag}")
 
-      if (clients.nonEmpty && clients != "*") {
-        val parsedClients: Set[String] = clients.split(/,/).toSet
-
-        if (parsedClients.nonEmpty) {
-          config.copy(apiKeys = parsedClients)
-
-          println(s"Running for clients ${config.apiKeys}")
-        }
+      if (config.apiKeys.nonEmpty) {
+        println(s"Running for clients ${config.apiKeys}")
       }
 
       val Some((jobSetup, jobConf)) = setup
@@ -124,14 +118,13 @@ object CoreJobRunner {
 
       implicit val mounts: Seq[String] = dbutils.fs.mounts().map(_.mountPoint)
 
-      List("chaordic-engine", "chaordic-dumps").foreach(mountStorage)
+      List("chaordic-engine").foreach(mountStorage)
 
-      mountBlobStorage("mail-ignition-sync", sys.env.getOrElse("USER_HISTORY_SAS", None))
-      mountBlobStorage("load-products-sync", sys.env.getOrElse("PLATFORM_PRODUCTS_SAS", None))
+      mountBlobStorage("mail-ignition", sys.env.getOrElse("MAIL_IGNITION_SAS", ""))
+      mountBlobStorage("platform-dumps-virginia", sys.env.getOrElse("PLATFORM_DUMPS_SAS", ""))
+      mountBlobStorage("chaordic-dumps", sys.env.getOrElse("CHAORDIC_DUMPS_SAS", ""))
       //TODO: Remover após refatoração
-      mountBlobStorage("azure-bs-teste", sys.env.getOrElse("BLOB_OUTPUT_SAS", None))
-
-      //TODO: Montar chaordic-dumps-sync apontando para o bucket s3://chaordic-dumps
+      mountBlobStorage("azure-bs-teste", sys.env.getOrElse("BLOB_OUTPUT_SAS", ""))
 
       builder.master(config.master)
       builder.appName(appName)
