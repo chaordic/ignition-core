@@ -1,3 +1,0 @@
-#!/bin/bash
-
-echo '*    -    nofile    1000000' >> /etc/security/limits.conf

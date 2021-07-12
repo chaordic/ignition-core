@@ -120,7 +120,6 @@ object CoreJobRunner {
       builder.master(config.master)
       builder.appName(appName)
 
-      builder.config("spark.hadoop.mapred.output.committer.class", classOf[DirectOutputCommitter].getName())
 
       defaultSparkConfMap.foreach { case (k, v) => builder.config(k, v) }
 
@@ -128,12 +127,6 @@ object CoreJobRunner {
 
       // Add logging context to driver
       setLoggingContextValues(config)
-
-      try {
-        builder.enableHiveSupport()
-      } catch {
-        case t: Throwable => logger.warn("Failed to enable HIVE support", t)
-      }
 
       val session = builder.getOrCreate()
 
@@ -147,21 +140,7 @@ object CoreJobRunner {
 
       val context = RunnerContext(sc, session, config)
 
-      try {
-        jobSetup.apply(context)
-      } catch {
-        case t: Throwable =>
-          t.printStackTrace()
-          System.exit(1) // force exit of all threads
-      }
-
-      import scala.concurrent.ExecutionContext.Implicits.global
-      Future {
-        // If everything is fine, the system will shut down without the help of this thread and YARN will report success
-        // But sometimes it gets stuck, then it's necessary to use the force, but this may finish the job as failed on YARN
-        Thread.sleep(30 * 1000)
-        System.exit(0) // force exit of all threads
-      }
+      jobSetup.apply(context)
     }
   }
 }
