@@ -36,7 +36,9 @@ object CoreJobRunner {
                           user: String = "nouser",
                           master: String = "local[*]",
                           executorMemory: String = "2G",
-                          extraArgs: Map[String, String] = Map.empty)
+                          extraArgs: Map[String, String] = Map.empty,
+                          apiKeys: Set[String] = Set.empty
+                          )
 
   def mountStorage(containerName: String)(implicit mounts: Seq[String]): Unit = {
     if (!mounts.contains(s"/mnt/$containerName")) {
