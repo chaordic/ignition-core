@@ -37,19 +37,24 @@ object CoreJobRunner {
                           master: String = "local[*]",
                           executorMemory: String = "2G",
                           extraArgs: Map[String, String] = Map.empty,
-                          apiKeys: Set[String] = Set.empty
-                          )
+                          apiKeys: Set[String] = Set.empty)
 
-  def mountStorage(containerName: String)(implicit mounts: Seq[String]): Unit = {
-    if (!mounts.contains(s"/mnt/$containerName")) {
-      dbutils.fs.mount(s"s3a://$containerName", s"/mnt/$containerName")
+  def mountStorage(containerName: String, mountPoint: String)(implicit mounts: Seq[String]): Unit = {
+    if (!mounts.contains(s"/mnt/$mountPoint")) {
+      dbutils.fs.mount(s"s3a://$containerName", s"/mnt/$mountPoint")
     }
   }
 
   def mountBlobStorage(containerName: String, sas: String)(implicit mounts: Seq[String]): Unit = {
+    val sasValue = sys.env.get(sas)
+    
+    if (sasValue.isEmpty) {
+      throw new Exception(s"No value provided for ${sas}. Verify your cluster env settings")
+    }
+    
     if (!mounts.contains(s"/mnt/$containerName")) {
-      // TODO: Get sas from env
-      val storageAccountName = "mailncdevqryv"
+      val storageAccountName = sys.env.getOrElse("STORAGE_ACCOUNT_NAME", "")
+
       val config = "fs.azure.sas." + containerName+ "." + storageAccountName + ".blob.core.windows.net"
 
       val source = s"wasbs://${containerName}@${storageAccountName}.blob.core.windows.net"
@@ -57,7 +62,7 @@ object CoreJobRunner {
       dbutils.fs.mount(
         source = source,
         mountPoint = s"/mnt/$containerName",
-        extraConfigs = Map(config -> sas)
+        extraConfigs = Map(config -> sasValue.get)
       )
     }
   }
@@ -88,7 +93,6 @@ object CoreJobRunner {
       opt[String]('a', "runner-apikeys") action { (x, c) =>
         c.copy(apiKeys = if (x != "*") x.split(",").toSet else Set.empty)
       }
-
       opt[(String, String)]('w', "runner-extra") unbounded() action { (x, c) =>
         c.copy(extraArgs = c.extraArgs ++ Map(x))
       }
@@ -97,11 +101,15 @@ object CoreJobRunner {
     parser.parse(args, RunnerConfig()) map { config =>
       val setup = jobsSetups.get(config.setupName)
 
-      println(s"Running ${config.setupName} with extra ${config.extraArgs}")
-      println(s"Running with tag ${config.tag}")
-
       require(setup.isDefined,
         s"Invalid job setup ${config.setupName}, available jobs setups: ${jobsSetups.keySet}")
+
+      println(s"Running ${config.setupName} with user ${config.user}")
+      println(s"Running with tag ${config.tag}")
+
+      if (config.apiKeys.nonEmpty) {
+        println(s"Running for ${config.apiKeys.mkString(", ")}")
+      }
 
       val Some((jobSetup, jobConf)) = setup
 
@@ -115,16 +123,15 @@ object CoreJobRunner {
 
       implicit val mounts: Seq[String] = dbutils.fs.mounts().map(_.mountPoint)
 
-      List("mail-ignition", "chaordic-engine", "chaordic-dumps", "platform-dumps-virginia").foreach(mountStorage)
+      mountStorage("chaordic-engine", "chaordic-engine")
+      mountStorage("mail-ignition", "aws-mail-ignition")
 
-      //TODO: Remover após refatoração
-
-      mountBlobStorage("mail-ignition-sync", "?sp=racwdl&st=2021-07-07T13:21:06Z&se=2025-07-07T21:21:06Z&spr=https&sv=2020-02-10&sr=c&sig=NeMFZeR0%2Fa60Ga6qv8d%2FjxWONZ5XNwKRf16XSMLQSgY%3D")
-      mountBlobStorage("load-products-sync", "?sp=racwdl&st=2021-07-07T13:19:21Z&se=2025-07-07T21:19:21Z&spr=https&sv=2020-02-10&sr=c&sig=b%2Fs3fu8BTnJM1CV1B8VYFEf2CGLkppMhvPRiXPHy2sE%3D")
+      mountBlobStorage("mail-ignition", "MAIL_IGNITION_SAS")
+      mountBlobStorage("platform-dumps-virginia", "PLATFORM_DUMPS_SAS")
+      mountBlobStorage("chaordic-dumps", "CHAORDIC_DUMPS_SAS")
 
       builder.master(config.master)
       builder.appName(appName)
-
 
       defaultSparkConfMap.foreach { case (k, v) => builder.config(k, v) }
 
