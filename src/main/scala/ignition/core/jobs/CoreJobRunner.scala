@@ -85,6 +85,9 @@ object CoreJobRunner {
       opt[String]('e', "runner-executor-memory") action { (x, c) =>
         c.copy(executorMemory = x)
       }
+      opt[String]('a', "runner-apikeys") action { (x, c) =>
+        c.copy(apiKeys = if (x != "*") x.split(",").toSet else Set.empty)
+      }
 
       opt[(String, String)]('w', "runner-extra") unbounded() action { (x, c) =>
         c.copy(extraArgs = c.extraArgs ++ Map(x))
