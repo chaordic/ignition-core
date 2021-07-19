@@ -450,7 +450,7 @@ object SparkContextUtils {
             if (startDate.isDefined && endDate.isDefined && dateTime.isDefined) {
               shouldList = isGoodDate(dateTime.get, startDate.get, endDate.get)
             } else {
-              logger.info(s"No date found for path ${folderPath}")
+              logger.debug(s"No date found for path ${folderPath}")
             }
 
             if (shouldList) {
@@ -461,7 +461,7 @@ object SparkContextUtils {
                 val filtered = sanitized.filter(file => file.path.endsWith("_SUCCESS") || file.path.endsWith("_FINISHED") || apiKeysToProcess.exists(file.path.contains))
 
                 // TODO: Remover após refatoração
-                filtered.filter(file => file.isDir).foreach(file => logger.info(s"Adding ${file.path} to dirs list"))
+                filtered.filter(file => file.isDir).foreach(file => logger.debug(s"Adding ${file.path} to dirs list"))
 
                 Option(filtered)
               } else {
